@@ -115,3 +115,4 @@ Frontend dibangun dengan pendekatan **Hybrid Client Architecture**:
 
 2. **Membuka Langsung di Browser**:
    - Cukup klik dua kali berkas `frontend/index.html` pada peramban web modern (Google Chrome, Mozilla Firefox, Microsoft Edge, Safari).
+
