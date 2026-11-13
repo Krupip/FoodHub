@@ -16,7 +16,7 @@ SELECT id, name, email, password_hash, role FROM users WHERE email = 'raka@conto
 -- --------------------------------------------------------------------------
 SELECT id, name, slug FROM categories ORDER BY id;                -- chip kategori
 
-SELECT * FROM v_recipe_cards                                      -- resep populer
+SELECT * FROM v_recipe_cards WHERE is_published = 1                 -- resep populer
 ORDER BY favorite_count DESC, avg_rating DESC
 LIMIT 4;
 
@@ -28,7 +28,8 @@ SELECT DISTINCT v.*
 FROM v_recipe_cards v
 LEFT JOIN recipe_ingredients ri ON ri.recipe_id = v.id
 LEFT JOIN recipe_categories  rc ON rc.recipe_id = v.id
-WHERE (v.title LIKE '%soto%' OR ri.name LIKE '%soto%')
+WHERE v.is_published = 1
+  AND (v.title LIKE '%soto%' OR ri.name LIKE '%soto%')
   AND rc.category_id = 1
   AND v.cook_time_minutes <= 90
   AND v.difficulty = 'sedang'
@@ -37,7 +38,7 @@ ORDER BY v.title;
 -- --------------------------------------------------------------------------
 -- DETAIL RESEP
 -- --------------------------------------------------------------------------
-SELECT v.*, r.story FROM v_recipe_cards v JOIN recipes r ON r.id = v.id WHERE v.id = 1;
+SELECT v.*, r.story FROM v_recipe_cards v JOIN recipes r ON r.id = v.id WHERE v.id = 1 AND v.is_published = 1;
 
 -- Bahan, takaran disesuaikan porsi (contoh: dari porsi dasar jadi 3 porsi)
 SELECT ri.name, ROUND(ri.quantity * 3 / r.servings, 2) AS quantity, ri.unit
@@ -71,13 +72,13 @@ SELECT id, name, email, role, bio, avatar_path, created_at FROM users WHERE id =
 
 -- Resep Favorit
 SELECT v.* FROM favorites f JOIN v_recipe_cards v ON v.id = f.recipe_id
-WHERE f.user_id = 2 ORDER BY f.created_at DESC;
+WHERE f.user_id = 2 AND v.is_published = 1 ORDER BY f.created_at DESC;
 
 -- --------------------------------------------------------------------------
 -- KELOLA RESEP (admin) - cek $_SESSION role = 'admin' di PHP
 -- --------------------------------------------------------------------------
 -- Daftar resep untuk tabel admin
-SELECT id, title, region, categories, cook_time_minutes, difficulty, created_at
+SELECT id, title, region, categories, cook_time_minutes, difficulty, is_published, created_at
 FROM v_recipe_cards ORDER BY created_at DESC;
 
 -- TAMBAH RESEP (pakai transaksi)
@@ -99,6 +100,9 @@ FROM v_recipe_cards ORDER BY created_at DESC;
 -- DELETE FROM recipe_steps       WHERE recipe_id = ?;
 -- ...INSERT ulang seperti Tambah Resep...
 -- COMMIT;
+
+-- SEMBUNYIKAN / TAYANGKAN
+-- UPDATE recipes SET is_published = ? WHERE id = ?;
 
 -- HAPUS RESEP (bahan, langkah, kategori, favorit, ulasan ikut terhapus - CASCADE)
 -- DELETE FROM recipes WHERE id = ?;

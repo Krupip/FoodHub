@@ -59,7 +59,7 @@ erDiagram
 |---|---|---|
 | `users` | Akun member & admin (`role`) | Masuk/Daftar, Informasi Profil |
 | `categories` | Kategori resep | Beranda, Daftar Resep, form Tambah/Edit Resep |
-| `recipes` | Data utama resep (judul, asal daerah, cerita, foto, waktu, kesulitan, porsi) | Semua halaman resep, Kelola Resep |
+| `recipes` | Data utama resep (judul, asal daerah, cerita, foto, waktu, kesulitan, porsi). `is_published` = 0 berarti disembunyikan admin | Semua halaman resep, Kelola Resep |
 | `recipe_categories` | Relasi banyak-ke-banyak resep ↔ kategori | Filter kategori |
 | `recipe_ingredients` | Bahan + takaran untuk porsi dasar | Detail Resep |
 | `recipe_steps` | Langkah memasak berurutan | Detail Resep |
@@ -69,6 +69,7 @@ erDiagram
 
 ## Catatan desain
 
+- **Tayang/disembunyikan**: halaman publik hanya menampilkan resep dengan `is_published = 1`.
 - **Pengatur porsi**: takaran baru = `quantity × porsi_baru ÷ recipes.servings`.
 - **Hapus resep**: bahan, langkah, kategori, favorit, dan ulasannya ikut terhapus otomatis (`ON DELETE CASCADE`).
 - **Integritas**: email unik, slug resep unik, rating dibatasi 1–5 (`CHECK`), satu ulasan per member per resep.

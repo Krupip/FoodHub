@@ -67,6 +67,7 @@ CREATE TABLE `recipes` (
   `cook_time_minutes` SMALLINT UNSIGNED NOT NULL,
   `difficulty`        ENUM('mudah','sedang','sulit') NOT NULL DEFAULT 'sedang',
   `servings`          TINYINT UNSIGNED NOT NULL DEFAULT 2 COMMENT 'porsi dasar takaran',
+  `is_published`      TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1 = tayang, 0 = disembunyikan admin',
   `created_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at`        DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -155,7 +156,7 @@ CREATE TABLE `reviews` (
 CREATE VIEW `v_recipe_cards` AS
 SELECT
   r.id, r.title, r.slug, r.region, r.image_path, r.cook_time_minutes,
-  r.difficulty, r.servings, r.created_at,
+  r.difficulty, r.servings, r.is_published, r.created_at,
   (SELECT ROUND(AVG(rv.rating), 1) FROM reviews rv WHERE rv.recipe_id = r.id) AS avg_rating,
   (SELECT COUNT(*) FROM reviews rv WHERE rv.recipe_id = r.id)                AS review_count,
   (SELECT COUNT(*) FROM favorites f WHERE f.recipe_id = r.id)                AS favorite_count,
