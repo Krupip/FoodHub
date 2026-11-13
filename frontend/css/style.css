@@ -487,18 +487,20 @@ section.container {
    ========================================================================== */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(235px, 1fr));
-  gap: 1.3rem;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
 }
 
 .card {
-  display: block;
+  display: flex;
+  flex-direction: column;
   text-decoration: none;
   background: #fff;
   border: 2px solid var(--ink);
-  border-radius: 20px;
+  border-radius: 22px;
   overflow: hidden;
   box-shadow: var(--sh);
+  transition: transform .15s, box-shadow .15s;
 }
 
 .card:hover {
@@ -507,15 +509,17 @@ section.container {
 }
 
 .thumb {
-  height: 150px;
+  height: 240px;
   display: grid;
   place-items: center;
   position: relative;
+  background: #F4E7D7;
+  overflow: hidden;
 }
 
 .thumb .ic {
-  width: 3.2rem;
-  height: 3.2rem;
+  width: 3.5rem;
+  height: 3.5rem;
   color: var(--ink);
   opacity: .8;
 }
@@ -524,6 +528,7 @@ section.container {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
 }
 
 .c0 { background: #FFD9D4; }
@@ -533,18 +538,35 @@ section.container {
 .c4 { background: #E3D6F2; }
 
 .cb {
-  padding: 1rem 1.1rem 1.1rem;
+  padding: 1.1rem 1.25rem 1.3rem;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
 .cb h3 {
-  margin-bottom: .3em;
+  font-size: 1.22rem;
+  margin: 0 0 .3em;
+  color: var(--ink);
+}
+
+.card .desc {
+  font-size: .88rem;
+  color: var(--mut);
+  margin: 0 0 .8rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.5;
 }
 
 .tags {
   display: flex;
   flex-wrap: wrap;
   gap: .3rem;
-  margin-bottom: .5rem;
+  margin-bottom: .6rem;
 }
 
 .tag {
@@ -572,9 +594,12 @@ section.container {
 .meta {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: .9rem;
-  font-size: .88rem;
+  font-size: .86rem;
   color: var(--mut);
+  margin-top: auto;
+  padding-top: .4rem;
 }
 
 .empty {
@@ -1038,6 +1063,86 @@ th {
 }
 
 /* ==========================================================================
+   Modal Dialog & Kelola Resep
+   ========================================================================== */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(36, 25, 21, .6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 1rem;
+}
+
+.modal-box {
+  background: #fff;
+  border: 2px solid var(--ink);
+  border-radius: 20px;
+  box-shadow: 6px 6px 0 var(--ink);
+  max-width: 640px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 1.8rem;
+}
+
+.modal-h {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.2rem;
+  padding-bottom: .8rem;
+  border-bottom: 2px solid var(--line);
+}
+
+.modal-h h2 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.modal-close {
+  background: none;
+  border: 0;
+  font-size: 1.8rem;
+  cursor: pointer;
+  color: var(--ink);
+  line-height: 1;
+  padding: 0 .2rem;
+}
+
+.fld-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 600px) {
+  .fld-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.t-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  display: block;
+  background: var(--sand);
+}
+
+.act-btns {
+  display: flex;
+  gap: .4rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ==========================================================================
    Footer & Toast Notification
    ========================================================================== */
 #foot {
@@ -1139,6 +1244,10 @@ th {
     grid-template-columns: 1fr;
   }
 
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
   .art {
     min-height: 240px;
   }
@@ -1198,6 +1307,16 @@ th {
 
   .tiles {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .thumb {
+    height: 200px;
   }
 }
 

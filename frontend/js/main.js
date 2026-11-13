@@ -175,10 +175,10 @@
      Data Resep Tradisional Indonesia (Lengkap dengan Foto Pinterest)
      ========================================================================== */
   const BASIC = ['garam', 'gula', 'minyak', 'air', 'es batu'];
-  const RECIPES = [
+  const DEFAULT_RECIPES = [
     {
       id: 1,
-      n: 'Rendang Daging Sapi',
+      n: 'Rendang',
       p: 'Sumatera Barat',
       k: ['Makanan Berat'],
       w: 180,
@@ -626,8 +626,17 @@
      ========================================================================== */
   const cats = () => ['Makanan Berat', 'Sehat', 'Minuman', 'Cepat', 'Anak Kos'];
   const hid = () => ld('fh_hid', []);
-  const all = () => RECIPES.filter(r => !hid().includes(r.id));
-  const byId = id => RECIPES.filter(r => String(r.id) === String(id))[0];
+  const recipesList = () => {
+    let list = ld('fh_recipes', null);
+    if (!list || !Array.isArray(list) || !list.length) {
+      list = DEFAULT_RECIPES.slice();
+      sv('fh_recipes', list);
+    }
+    return list;
+  };
+  const saveRecipes = list => sv('fh_recipes', list);
+  const all = () => recipesList().filter(r => !hid().includes(r.id));
+  const byId = id => recipesList().filter(r => String(r.id) === String(id))[0];
   const rvAll = () => ld('fh_rv', {});
 
   const rat = r => {
@@ -651,8 +660,8 @@
       <a class="card" href="${R}detail-resep.html?id=${encodeURIComponent(r.id)}">
         ${thumb(r)}
         <div class="cb">
-          <div class="tags">${tags(r)}</div>
           <h3>${esc(r.n)}</h3>
+          ${r.c ? `<p class="desc">${esc(r.c)}</p>` : ''}
           <div class="meta">
             <span>${ic('clock')} ${r.w} mnt</span>
             <span>${esc(r.l)}</span>
@@ -762,7 +771,7 @@
   function buildAdmin() {
     const L = [
       ['dasbor', 'Dasbor', 'grid'],
-      ['moderasi-resep', 'Moderasi Resep', 'check'],
+      ['kelola-resep', 'Kelola Resep', 'book'],
       ['kelola-pengguna', 'Kelola Pengguna', 'users']
     ];
 
@@ -771,7 +780,7 @@
         <img src="${R}img/logo-foodhub.jpg" alt="FoodHub">
       </a>
       ${L.map(l => `
-        <a href="${l[0]}.html"${l[0] === P ? ' class="on" aria-current="page"' : ''}>
+        <a href="${l[0]}.html"${(l[0] === P || (l[0] === 'kelola-resep' && P === 'moderasi-resep')) ? ' class="on" aria-current="page"' : ''}>
           ${ic(l[2])} ${l[1]}
         </a>
       `).join('')}
@@ -816,7 +825,7 @@
       $('#cats').innerHTML = '<a class="chip on" href="daftar-resep.html">Semua</a>' +
         cats().map(c => `<a class="chip" href="daftar-resep.html?kat=${encodeURIComponent(c)}">${esc(c)}</a>`).join('');
 
-      const top = all().slice().sort((x, y) => ((rat(y) || { a: 0 }).a) - ((rat(x) || { a: 0 }).a)).slice(0, 4);
+      const top = all().slice().sort((x, y) => ((rat(y) || { a: 0 }).a) - ((rat(x) || { a: 0 }).a)).slice(0, 3);
       $('#pop').innerHTML = top.map(card).join('');
 
       $('#heroForm').addEventListener('submit', e => {
@@ -1085,6 +1094,9 @@
       const render = () => {
         const favList = (U.fav || []).map(byId).filter(r => r && !hid().includes(r.id));
         $('#pf').innerHTML = `
+          <div class="sec-h" style="margin-bottom:1rem">
+            <h1>Informasi Profil</h1>
+          </div>
           <div class="panel">
             <div class="row" style="border:0;padding:0;box-shadow:none">
               <span class="av" style="display:grid;place-items:center;width:64px;height:64px;font-size:1.6rem">
@@ -1102,7 +1114,7 @@
               </div>
             </div>
 
-            <form id="nf" novalidate>
+            <form id="nf" novalidate style="margin-top:1.2rem">
               <div class="ok" id="no" hidden></div>
               <div class="err" id="ne" hidden></div>
               <div class="fld">
@@ -1115,15 +1127,16 @@
 
           <div style="margin-top:2.5rem">
             <div class="sec-h">
-              <h2>Resep Tersimpan (Favorit)</h2>
+              <h2>Resep Favorit</h2>
+              <span class="muted sm">${favList.length} resep disimpan</span>
             </div>
             <div id="favGrid">
               ${favList.length
                 ? `<div class="grid">${favList.map(r => `
                     <div>
                       ${card(r)}
-                      <button class="btn danger sm" type="button" data-u="${esc(r.id)}" style="margin-top:.6rem">
-                        ${ic('heart')} Hapus dari favorit
+                      <button class="btn danger sm" type="button" data-u="${esc(r.id)}" style="margin-top:.6rem;width:100%">
+                        ${ic('heart')} Hapus dari Favorit
                       </button>
                     </div>
                   `).join('')}</div>`
@@ -1237,16 +1250,17 @@
     dasbor() {
       $('#ds').innerHTML = `
         <div class="stat">
+          <div class="panel"><b>${recipesList().length}</b>Total resep</div>
           <div class="panel"><b>${all().length}</b>Resep tayang</div>
           <div class="panel"><b>${hid().length}</b>Resep disembunyikan</div>
           <div class="panel"><b>${users().length}</b>Pengguna</div>
         </div>
         <div class="row">
           <div class="grow">
-            <b>Moderasi resep</b><br>
-            <span class="muted sm">Tampilkan atau sembunyikan resep di situs.</span>
+            <b>Kelola resep</b><br>
+            <span class="muted sm">Tambah, edit, hapus, dan moderasi resep makanan Nusantara.</span>
           </div>
-          <a class="btn sm" href="moderasi-resep.html">Buka</a>
+          <a class="btn sm" href="kelola-resep.html">Buka</a>
         </div>
         <div class="row">
           <div class="grow">
@@ -1258,36 +1272,80 @@
       `;
     },
 
-    'moderasi-resep'() {
+    'kelola-resep'() {
+      const rootEl = $('#kr') || $('#md');
+      if (!rootEl) return;
+
       const draw = () => {
+        const list = recipesList();
         const h = hid();
-        $('#md').innerHTML = `
+
+        rootEl.innerHTML = `
+          <div class="sec-h" style="margin-bottom:1.2rem">
+            <div>
+              <h1 style="margin:0">Kelola Resep</h1>
+              <p class="muted sm" style="margin:.3rem 0 0">Tambah resep baru, edit resep yang ada, dan hapus resep.</p>
+            </div>
+            <button class="btn sm" id="btnTambahResep" type="button">
+              ${ic('plus')} Tambah Resep
+            </button>
+          </div>
+
+          <div class="stat">
+            <div class="panel"><b>${list.length}</b>Total resep</div>
+            <div class="panel"><b>${all().length}</b>Tayang</div>
+            <div class="panel"><b>${h.length}</b>Disembunyikan</div>
+          </div>
+
           <div class="tw">
             <table>
               <thead>
                 <tr>
-                  <th>Resep</th>
-                  <th>Asal</th>
+                  <th style="width:50px">Foto</th>
+                  <th>Nama Resep</th>
+                  <th>Asal Daerah</th>
+                  <th>Kategori</th>
+                  <th>Waktu &amp; Porsi</th>
                   <th>Status</th>
-                  <th>Aksi</th>
+                  <th style="width:240px">Aksi</th>
                 </tr>
               </thead>
               <tbody>
-                ${RECIPES.map(r => {
+                ${list.map(r => {
                   const x = h.includes(r.id);
+                  const imgUrl = r.f ? (R + esc(r.f)) : '';
                   return `
                     <tr>
-                      <td>${esc(r.n)}</td>
-                      <td>${esc(r.p || 'Umum')}</td>
+                      <td>
+                        ${imgUrl
+                          ? `<img class="t-thumb" src="${imgUrl}" alt="${esc(r.n)}">`
+                          : `<div class="t-thumb" style="display:grid;place-items:center">${ic('bowl')}</div>`
+                        }
+                      </td>
+                      <td>
+                        <strong>${esc(r.n)}</strong>
+                        ${r.c ? `<div class="muted sm" style="max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.c)}</div>` : ''}
+                      </td>
+                      <td>${esc(r.p || '-')}</td>
+                      <td>${(r.k || []).map(k => `<span class="tag">${esc(k)}</span>`).join(' ')}</td>
+                      <td>${r.w} mnt · ${r.s || 4} porsi</td>
                       <td>
                         <span class="sts ${x ? 'ditolak' : 'disetujui'}">
                           ${x ? 'disembunyikan' : 'tayang'}
                         </span>
                       </td>
                       <td>
-                        <button class="btn ${x ? '' : 'danger'} sm" type="button" data-i="${r.id}">
-                          ${x ? 'Tampilkan' : 'Sembunyikan'}
-                        </button>
+                        <div class="act-btns">
+                          <button class="btn ghost sm" type="button" data-edit="${r.id}" title="Edit resep">
+                            ${ic('edit')} Edit
+                          </button>
+                          <button class="btn danger sm" type="button" data-del="${r.id}" title="Hapus resep">
+                            ${ic('trash')} Hapus
+                          </button>
+                          <button class="btn sm ${x ? '' : 'ghost'}" type="button" data-i="${r.id}" title="${x ? 'Tampilkan' : 'Sembunyikan'}">
+                            ${x ? 'Tayang' : 'Sembunyi'}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   `;
@@ -1295,21 +1353,261 @@
               </tbody>
             </table>
           </div>
+
+          <div class="modal-backdrop" id="recipeModal" hidden>
+            <div class="modal-box">
+              <div class="modal-h">
+                <h2 id="modalTitle">Tambah Resep Baru</h2>
+                <button class="modal-close" id="modalClose" type="button">&times;</button>
+              </div>
+              <form id="recipeForm" novalidate>
+                <input type="hidden" id="rf_id">
+                
+                <div class="fld">
+                  <label for="rf_n">Nama Resep *</label>
+                  <input id="rf_n" required placeholder="Contoh: Rendang Daging Sapi">
+                </div>
+
+                <div class="fld-row">
+                  <div class="fld">
+                    <label for="rf_p">Asal Daerah</label>
+                    <input id="rf_p" placeholder="Contoh: Sumatera Barat">
+                  </div>
+                  <div class="fld">
+                    <label for="rf_k">Kategori</label>
+                    <select id="rf_k">
+                      <option value="Makanan Berat">Makanan Berat</option>
+                      <option value="Sehat">Sehat</option>
+                      <option value="Minuman">Minuman</option>
+                      <option value="Cepat">Cepat</option>
+                      <option value="Anak Kos">Anak Kos</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="fld-row">
+                  <div class="fld">
+                    <label for="rf_w">Waktu Memasak (menit) *</label>
+                    <input type="number" id="rf_w" min="1" value="45" required>
+                  </div>
+                  <div class="fld">
+                    <label for="rf_l">Tingkat Kesulitan</label>
+                    <select id="rf_l">
+                      <option value="Mudah">Mudah</option>
+                      <option value="Sedang" selected>Sedang</option>
+                      <option value="Sulit">Sulit</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="fld-row">
+                  <div class="fld">
+                    <label for="rf_s">Porsi (orang)</label>
+                    <input type="number" id="rf_s" min="1" value="4">
+                  </div>
+                  <div class="fld">
+                    <label for="rf_f">Foto Resep</label>
+                    <select id="rf_f">
+                      <option value="img/rendang.jpg">Rendang (img/rendang.jpg)</option>
+                      <option value="img/gulai-itiak.jpg">Gulai Itiak (img/gulai-itiak.jpg)</option>
+                      <option value="img/sate-padang.jpg">Sate Padang (img/sate-padang.jpg)</option>
+                      <option value="img/pempek.jpg">Pempek (img/pempek.jpg)</option>
+                      <option value="img/soto-lamongan.jpg">Soto Lamongan (img/soto-lamongan.jpg)</option>
+                      <option value="img/rawon.jpg">Rawon (img/rawon.jpg)</option>
+                      <option value="img/gudeg.jpg">Gudeg (img/gudeg.jpg)</option>
+                      <option value="img/sate-lilit.jpg">Sate Lilit (img/sate-lilit.jpg)</option>
+                      <option value="img/ayam-betutu.jpg">Ayam Betutu (img/ayam-betutu.jpg)</option>
+                      <option value="img/gado-gado.jpg">Gado-Gado (img/gado-gado.jpg)</option>
+                      <option value="img/es-cendol.jpg">Es Cendol (img/es-cendol.jpg)</option>
+                      <option value="img/nasi-liwet.jpg">Nasi Liwet (img/nasi-liwet.jpg)</option>
+                      <option value="img/soto-makassar.jpg">Soto Makassar (img/soto-makassar.jpg)</option>
+                      <option value="img/papeda.jpg">Papeda (img/papeda.jpg)</option>
+                      <option value="">Tanpa foto (ikon mangkuk)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="fld">
+                  <label for="rf_c">Deskripsi Singkat *</label>
+                  <textarea id="rf_c" rows="2" required placeholder="Deskripsi singkat tentang cita rasa masakan ini..."></textarea>
+                </div>
+
+                <div class="fld">
+                  <label for="rf_b">Bahan-Bahan (1 bahan per baris) *</label>
+                  <textarea id="rf_b" rows="3" required placeholder="Contoh:&#10;Daging sapi, 500, g&#10;Santan kelapa, 500, ml&#10;Garam, 1, sdt"></textarea>
+                  <span class="muted sm">Format: Nama Bahan, Jumlah, Satuan (atau tulis langsung).</span>
+                </div>
+
+                <div class="fld">
+                  <label for="rf_t">Langkah Memasak (1 langkah per baris) *</label>
+                  <textarea id="rf_t" rows="3" required placeholder="Contoh:&#10;Haluskan semua bumbu halus.&#10;Tumis bumbu hingga wangi semerbak.&#10;Masukkan santan dan masak hingga matang merata."></textarea>
+                </div>
+
+                <div style="display:flex;gap:.8rem;justify-content:flex-end;margin-top:1.2rem">
+                  <button class="btn ghost" type="button" id="modalCancel">Batal</button>
+                  <button class="btn" type="submit" id="modalSubmit">Simpan Resep</button>
+                </div>
+              </form>
+            </div>
+          </div>
         `;
       };
 
-      $('#md').addEventListener('click', e => {
-        const b = e.target.closest('[data-i]');
-        if (!b) return;
-        const id = +b.dataset.i;
-        const h = hid();
-        const x = h.includes(id);
-        sv('fh_hid', x ? h.filter(i => i !== id) : h.concat(id));
+      const openModal = (recipe) => {
+        const modal = $('#recipeModal');
+        if (!modal) return;
+        const title = $('#modalTitle');
+        const form = $('#recipeForm');
+
+        if (recipe) {
+          title.textContent = 'Edit Resep: ' + recipe.n;
+          $('#rf_id').value = recipe.id;
+          $('#rf_n').value = recipe.n || '';
+          $('#rf_p').value = recipe.p || '';
+          $('#rf_k').value = (recipe.k && recipe.k[0]) ? recipe.k[0] : 'Makanan Berat';
+          $('#rf_w').value = recipe.w || 45;
+          $('#rf_l').value = recipe.l || 'Sedang';
+          $('#rf_s').value = recipe.s || 4;
+          $('#rf_f').value = recipe.f || '';
+          $('#rf_c').value = recipe.c || '';
+          $('#rf_b').value = (recipe.b || []).map(x => Array.isArray(x) ? x.join(', ') : x).join('\n');
+          $('#rf_t').value = (recipe.t || []).join('\n');
+        } else {
+          title.textContent = 'Tambah Resep Baru';
+          form.reset();
+          $('#rf_id').value = '';
+          $('#rf_w').value = 45;
+          $('#rf_s').value = 4;
+          $('#rf_l').value = 'Sedang';
+          $('#rf_k').value = 'Makanan Berat';
+          $('#rf_f').value = 'img/rendang.jpg';
+        }
+        modal.hidden = false;
+      };
+
+      const closeModal = () => {
+        const modal = $('#recipeModal');
+        if (modal) modal.hidden = true;
+      };
+
+      rootEl.addEventListener('click', e => {
+        if (e.target.closest('#btnTambahResep')) {
+          openModal(null);
+          return;
+        }
+
+        if (e.target.closest('#modalClose') || e.target.closest('#modalCancel')) {
+          closeModal();
+          return;
+        }
+
+        const editBtn = e.target.closest('[data-edit]');
+        if (editBtn) {
+          const id = +editBtn.dataset.edit;
+          const r = byId(id);
+          if (r) openModal(r);
+          return;
+        }
+
+        const delBtn = e.target.closest('[data-del]');
+        if (delBtn) {
+          const id = +delBtn.dataset.del;
+          const r = byId(id);
+          if (!r) return;
+          if (!confirm(`Apakah Anda yakin ingin menghapus resep "${r.n}"?`)) return;
+          const list = recipesList().filter(x => x.id !== id);
+          saveRecipes(list);
+          draw();
+          toast('Resep berhasil dihapus.');
+          return;
+        }
+
+        const toggleBtn = e.target.closest('[data-i]');
+        if (toggleBtn) {
+          const id = +toggleBtn.dataset.i;
+          const h = hid();
+          const x = h.includes(id);
+          sv('fh_hid', x ? h.filter(i => i !== id) : h.concat(id));
+          draw();
+          toast(x ? 'Resep ditampilkan.' : 'Resep disembunyikan.');
+          return;
+        }
+      });
+
+      rootEl.addEventListener('submit', e => {
+        if (e.target.id !== 'recipeForm') return;
+        e.preventDefault();
+
+        const idVal = $('#rf_id').value;
+        const n = $('#rf_n').value.trim();
+        const p = $('#rf_p').value.trim();
+        const k = [$('#rf_k').value];
+        const w = +$('#rf_w').value || 30;
+        const l = $('#rf_l').value;
+        const s = +$('#rf_s').value || 4;
+        const f = $('#rf_f').value.trim();
+        const c = $('#rf_c').value.trim();
+        const bRaw = $('#rf_b').value.trim();
+        const tRaw = $('#rf_t').value.trim();
+
+        if (!n) {
+          toast('Nama resep wajib diisi.');
+          return;
+        }
+        if (!c) {
+          toast('Deskripsi resep wajib diisi.');
+          return;
+        }
+
+        const b = bRaw.split('\n').map(line => line.trim()).filter(Boolean).map(line => {
+          if (line.includes(',')) {
+            const parts = line.split(',').map(x => x.trim());
+            return [parts[0], isNaN(+parts[1]) ? parts[1] : +parts[1], parts[2] || ''];
+          }
+          return [line, 1, 'secukupnya'];
+        });
+
+        const t = tRaw.split('\n').map(line => line.trim()).filter(Boolean);
+
+        const list = recipesList();
+        if (idVal) {
+          const idx = list.findIndex(x => String(x.id) === String(idVal));
+          if (idx !== -1) {
+            list[idx] = Object.assign({}, list[idx], { n, p, k, w, l, s, f, c, b, t });
+            saveRecipes(list);
+            toast('Resep berhasil diperbarui!');
+          }
+        } else {
+          const newRecipe = {
+            id: Date.now(),
+            n,
+            p: p || 'Nusantara',
+            k,
+            w,
+            l,
+            s,
+            r: 5.0,
+            rc: 1,
+            f,
+            u: (U && U.name) ? U.name : 'Admin FoodHub',
+            c,
+            b: b.length ? b : [['Bahan utama', 1, 'porsi']],
+            t: t.length ? t : ['Masak bahan hingga matang dan sajikan hangat.']
+          };
+          list.unshift(newRecipe);
+          saveRecipes(list);
+          toast('Resep berhasil ditambahkan!');
+        }
+
+        closeModal();
         draw();
-        toast(x ? 'Resep ditampilkan.' : 'Resep disembunyikan.');
       });
 
       draw();
+    },
+
+    'moderasi-resep'() {
+      this['kelola-resep']();
     },
 
     'kelola-pengguna'() {
