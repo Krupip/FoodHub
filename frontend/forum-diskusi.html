@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Forum Diskusi | FoodHub</title>
+  <link rel="icon" href="img/logo-foodhub.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;0,800;1,600&family=Outfit:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="forum-diskusi" data-root="" data-access="member">
+  <header id="nav"></header>
+
+  <main>
+    <div class="container narrow">
+      <div class="ph">
+        <h1>Forum diskusi</h1>
+        <p>Tanya jawab dan berbagi tips memasak sesama pengguna.</p>
+        <button class="btn" id="nt" type="button"><i data-ic="plus"></i> Buat topik</button>
+      </div>
+
+      <form class="formbox" id="tf" hidden novalidate style="margin-bottom:1.5rem">
+        <div class="err" id="te" hidden></div>
+        <div class="fld">
+          <label for="tj">Judul topik</label>
+          <input id="tj" maxlength="100">
+        </div>
+        <div class="fld">
+          <label for="tb">Isi topik</label>
+          <textarea id="tb"></textarea>
+        </div>
+        <button class="btn" type="submit"><i data-ic="send"></i> Kirim topik</button>
+      </form>
+
+      <div id="tl"></div>
+    </div>
+  </main>
+
+  <footer id="foot"></footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

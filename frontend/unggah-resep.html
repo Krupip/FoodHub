@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Unggah Resep | FoodHub</title>
+  <link rel="icon" href="img/logo-foodhub.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;0,800;1,600&family=Outfit:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="unggah-resep" data-root="" data-access="member">
+  <header id="nav"></header>
+
+  <main>
+    <div class="container narrow">
+      <div class="ph">
+        <h1 id="ut">Unggah resep</h1>
+        <p>Resep akan ditinjau admin sebelum tampil di Daftar Resep.</p>
+      </div>
+
+      <form class="formbox" id="uf" novalidate>
+        <div class="err" id="ue" hidden></div>
+
+        <div class="fld">
+          <label for="nm">Nama resep</label>
+          <input id="nm" name="nm" maxlength="80">
+        </div>
+
+        <div class="row2">
+          <div class="fld">
+            <label for="pv">Asal daerah</label>
+            <select id="pv" name="pv"></select>
+          </div>
+          <div class="fld">
+            <label for="kt">Kategori</label>
+            <select id="kt" name="kt"></select>
+          </div>
+        </div>
+
+        <div class="row3">
+          <div class="fld">
+            <label for="wk">Waktu (menit)</label>
+            <input id="wk" name="wk" type="number" min="1" max="1440" value="30">
+          </div>
+          <div class="fld">
+            <label for="lv">Tingkat</label>
+            <select id="lv" name="lv">
+              <option>Mudah</option>
+              <option>Sedang</option>
+              <option>Sulit</option>
+            </select>
+          </div>
+          <div class="fld">
+            <label for="sj">Porsi</label>
+            <input id="sj" name="sj" type="number" min="1" max="50" value="2">
+          </div>
+        </div>
+
+        <div class="fld">
+          <label for="ft">Foto makanan (maks. 250 KB)</label>
+          <input id="ft" name="ft" type="file" accept="image/*">
+          <div id="pvw"></div>
+        </div>
+
+        <div class="fld">
+          <label for="cr">Cerita di balik resep</label>
+          <textarea id="cr" name="cr"></textarea>
+        </div>
+
+        <div class="fld">
+          <label for="bh">Bahan (satu per baris: nama, jumlah, satuan)</label>
+          <textarea id="bh" name="bh" placeholder="Telur, 4, butir&#10;Tomat, 2, buah"></textarea>
+        </div>
+
+        <div class="fld">
+          <label for="lg">Langkah memasak (satu langkah per baris)</label>
+          <textarea id="lg" name="lg"></textarea>
+        </div>
+
+        <button class="btn" type="submit"><i data-ic="send"></i> Kirim resep</button>
+      </form>
+    </div>
+  </main>
+
+  <footer id="foot"></footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

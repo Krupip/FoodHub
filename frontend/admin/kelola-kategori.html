@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kelola Kategori | FoodHub</title>
+  <link rel="icon" href="../img/logo-foodhub.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;0,800;1,600&family=Outfit:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body data-page="kelola-kategori" data-root="../" data-access="admin">
+  <div class="adm">
+    <aside id="side"></aside>
+    <div>
+      <header id="top"></header>
+      <main class="adm-c">
+        <h1>Kelola kategori</h1>
+        <form class="filters" id="kf" novalidate>
+          <div class="fld grow">
+            <label for="kn">Kategori baru</label>
+            <input id="kn" maxlength="30">
+          </div>
+          <button class="btn" type="submit"><i data-ic="plus"></i> Tambah kategori</button>
+        </form>
+        <div class="err" id="ke" hidden></div>
+        <div id="kl"></div>
+      </main>
+    </div>
+  </div>
+
+  <script src="../js/main.js"></script>
+</body>
+</html>
