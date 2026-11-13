@@ -953,6 +953,23 @@
       run();
     },
 
+    faq() {
+      const chips = $$('#faqFilter .chip');
+      const groups = $$('.faq-group');
+      if (!chips.length) return;
+
+      chips.forEach(btn => {
+        btn.addEventListener('click', () => {
+          chips.forEach(b => b.classList.remove('on'));
+          btn.classList.add('on');
+          const cat = btn.dataset.cat;
+          groups.forEach(g => {
+            g.hidden = !(cat === 'all' || g.dataset.group === cat);
+          });
+        });
+      });
+    },
+
     async 'detail-resep'() {
       const id = qs.get('id');
       const box = $('#dr');
