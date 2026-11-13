@@ -1,8 +1,7 @@
 /* ==========================================================================
    FoodHub - main.js
-   Frontend murni. Data contoh disimpan di localStorage agar semua fitur bisa
-   dicoba tanpa backend. Saat backend siap, ganti fungsi penyimpanan (ld/sv/users)
-   dengan fetch ke API.
+   Frontend terhubung ke backend API PHP (MySQL/MariaDB).
+   Endpoint sesuai backend/README.md dengan fallback data lokal saat offline.
    ========================================================================== */
 
 (function () {
@@ -26,25 +25,8 @@
     "'": '&#39;'
   }[c]));
 
-  /** Muat data dari localStorage */
-  const ld = (k, d) => {
-    try {
-      const v = localStorage.getItem(k);
-      return v ? JSON.parse(v) : d;
-    } catch (e) {
-      return d;
-    }
-  };
-
-  /** Simpan data ke localStorage */
-  const sv = (k, v) => {
-    try {
-      localStorage.setItem(k, JSON.stringify(v));
-    } catch (e) {
-      toast('Penyimpanan peramban penuh.');
-    }
-  };
-
+  /** Format angka lokalisasi Indonesia */
+  const fmt = n => (Math.round(n * 100) / 100).toLocaleString('id-ID', { maximumFractionDigits: 2 });
   const today = () => new Date().toISOString().slice(0, 10);
 
   /** Tampilkan notifikasi pop-up (toast) */
@@ -65,9 +47,34 @@
   }
 
   /* ==========================================================================
+     API Client (Fetch ke Backend PHP)
+     ========================================================================== */
+  const API_BASE = (R ? (R + '../') : '../') + 'backend/api/';
+
+  async function api(path, opts = {}) {
+    opts.credentials = 'same-origin';
+    opts.headers = Object.assign({
+      'Content-Type': 'application/json'
+    }, opts.headers || {});
+
+    if (opts.body && typeof opts.body === 'object' && !(opts.body instanceof FormData)) {
+      opts.body = JSON.stringify(opts.body);
+    }
+
+    const res = await fetch(API_BASE + path, opts);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(data.error || 'Terjadi kesalahan sistem.');
+      err.status = res.status;
+      err.data = data;
+      throw err;
+    }
+    return data;
+  }
+
+  /* ==========================================================================
      Ikon SVG
      ========================================================================== */
-  const ICON_FILES = false;
   const IC = {
     search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
     clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
@@ -95,86 +102,19 @@
     share: '<circle cx="6" cy="12" r="2.5"/><circle cx="17" cy="6" r="2.5"/><circle cx="17" cy="18" r="2.5"/><path d="m8.2 10.8 6.6-3.6M8.2 13.2l6.6 3.6"/>'
   };
 
-  const ic = n => ICON_FILES
-    ? `<img class="ic" src="${R}img/icons/${n}.svg" alt="">`
-    : `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${IC[n] || ''}</svg>`;
-
-  const hydrate = root => $$('[data-ic]', root).forEach(e => {
-    e.innerHTML = ic(e.dataset.ic);
-  });
+  const ic = n => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${IC[n] || ''}</svg>`;
+  const hydrate = root => $$('[data-ic]', root).forEach(e => { e.innerHTML = ic(e.dataset.ic); });
 
   /* ==========================================================================
-     Sesi & Pengguna (Data Demo)
+     Data Cadangan Lokal (Offline Fallback saat API belum berjalan)
      ========================================================================== */
-  const sess = () => {
-    try {
-      const v = sessionStorage.getItem('fh_s') || localStorage.getItem('fh_s');
-      return v ? JSON.parse(v) : null;
-    } catch (e) {
-      return null;
-    }
+  const ld = (k, d) => {
+    try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; }
+  };
+  const sv = (k, v) => {
+    try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {}
   };
 
-  const setSess = (u, keep) => {
-    try {
-      sessionStorage.removeItem('fh_s');
-      localStorage.removeItem('fh_s');
-      (keep ? localStorage : sessionStorage).setItem('fh_s', JSON.stringify({ email: u.email }));
-    } catch (e) {
-      /* abaikan */
-    }
-  };
-
-  const endSess = () => {
-    try {
-      sessionStorage.removeItem('fh_s');
-      localStorage.removeItem('fh_s');
-    } catch (e) {
-      /* abaikan */
-    }
-  };
-
-  function users() {
-    let u = ld('fh_users', null);
-    if (!u) {
-      u = [
-        { name: 'Admin FoodHub', email: 'admin@foodhub.id', pass: 'admin123', role: 'admin', fav: [], at: '2026-08-01' },
-        { name: 'Raka Pratama', email: 'raka@contoh.id', pass: 'rahasia123', role: 'member', fav: [], at: '2026-09-12' },
-        { name: 'Nadia Putri', email: 'nadia@contoh.id', pass: 'rahasia123', role: 'member', fav: [], at: '2026-10-03' }
-      ];
-      sv('fh_users', u);
-    }
-    return u;
-  }
-
-  const me = () => {
-    const s = sess();
-    return s ? (users().filter(x => x.email === s.email)[0] || null) : null;
-  };
-
-  let U = me();
-
-  /* Proteksi Akses */
-  if (ACC === 'member' && !U) {
-    location.replace(R + 'masuk.html?next=' + encodeURIComponent(location.pathname.split('/').pop() + location.search));
-    return;
-  }
-
-  if (ACC === 'admin') {
-    if (!U) {
-      location.replace(R + 'masuk.html?next=' + encodeURIComponent('admin/' + location.pathname.split('/').pop()));
-      return;
-    }
-    if (U.role !== 'admin') {
-      location.replace(R + 'index.html');
-      return;
-    }
-  }
-
-  /* ==========================================================================
-     Data Resep Tradisional Indonesia (Lengkap dengan Foto Pinterest)
-     ========================================================================== */
-  const BASIC = ['garam', 'gula', 'minyak', 'air', 'es batu'];
   const DEFAULT_RECIPES = [
     {
       id: 1,
@@ -189,6 +129,7 @@
       f: 'img/rendang.jpg',
       u: 'Tim FoodHub',
       c: 'Olahan daging sapi empuk kaya rempah khas Minangkabau yang dimasak perlahan hingga santan mengering dan bumbu meresap sempurna.',
+      is_published: true,
       b: [
         ['Daging sapi', 1000, 'g'],
         ['Santan kental', 1000, 'ml'],
@@ -221,6 +162,7 @@
       f: 'img/gulai-itiak.jpg',
       u: 'Tim FoodHub',
       c: 'Gulai bebek muda khas Koto Gadang Bukittinggi dengan lumuran sambal cabai hijau berlimpah dan santan gurih aromatik.',
+      is_published: true,
       b: [
         ['Bebek muda', 1, 'ekor'],
         ['Cabai hijau keriting', 250, 'g'],
@@ -248,26 +190,26 @@
       l: 'Sedang',
       s: 4,
       r: 4.9,
-      rc: 39,
+      rc: 37,
       f: 'img/sate-padang.jpg',
       u: 'Tim FoodHub',
-      c: 'Sate lidah dan daging sapi empuk dengan siraman kuah kuning kental kaya rempah kunyit, serai, dan lada gurih pedas.',
+      c: 'Sate lidah dan daging sapi berkuah kuning kental kaya rempah, disajikan bersama ketupat hangat dan taburan bawang goreng.',
+      is_published: true,
       b: [
         ['Daging dan lidah sapi', 500, 'g'],
-        ['Tepung beras', 60, 'g'],
-        ['Kunyit', 4, 'ruas'],
-        ['Bawang merah', 8, 'siung'],
-        ['Bawang putih', 4, 'siung'],
-        ['Ketumbar sangrai', 1, 'sdm'],
-        ['Serai', 2, 'batang'],
-        ['Air kaldu rebusan', 800, 'ml'],
+        ['Tepung beras', 50, 'g'],
+        ['Air kaldu rebusan daging', 500, 'ml'],
+        ['Kunyit bakar', 2, 'ruas'],
+        ['Serai memarkan', 2, 'batang'],
+        ['Ketumbar bubuk', 1, 'sdm'],
+        ['Jintan bubuk', 0.5, 'sdt'],
         ['Garam', 1.5, 'sdt']
       ],
       t: [
-        'Rebus potongan daging dan lidah sapi bersama bumbu rempah halus dan serai hingga empuk, lalu potong dadu.',
-        'Tusukkan daging pada tusukan sate bambu, bakar sebentar di atas bara api beraroma asap.',
-        'Saring air kaldu rebusan, larutkan tepung beras, lalu masak sambil diaduk cepat hingga kuah meletup-letup kental.',
-        'Sajikan sate hangat disiram kuah kuning kental dan taburan bawang goreng renyah.'
+        'Rebus daging dan lidah sapi dengan bumbu rempah hingga empuk, lalu potong dadu dan tusuk ke lidi sate.',
+        'Bakar sate di atas bara api sebentar hingga beraroma wangi khas panggangan.',
+        'Larutkan tepung beras dengan air kaldu sisa rebusan yang telah dibumbui kunyit dan rempah.',
+        'Masak kuah hingga mendidih dan mengental licin, lalu siramkan melimpah di atas sate hangat.'
       ]
     },
     {
@@ -279,91 +221,94 @@
       l: 'Sedang',
       s: 6,
       r: 4.8,
-      rc: 33,
+      rc: 39,
       f: 'img/pempek.jpg',
       u: 'Tim FoodHub',
-      c: 'Olahan ikan tenggiri kenyal khas Palembang berisi telur utuh, digoreng garing lalu disajikan dengan cuko pedas manis asam.',
+      c: 'Olahan ikan tenggiri kenyal gurih khas Palembang berisi telur bebek utuh, dinikmati bersama cuko asam pedas manis pekat.',
+      is_published: true,
       b: [
-        ['Ikan tenggiri giling', 500, 'g'],
-        ['Tepung sagu tani', 300, 'g'],
-        ['Telur ayam', 4, 'butir'],
-        ['Bawang putih', 4, 'siung'],
-        ['Gula merah batok', 200, 'g'],
-        ['Cabai rawit hijau', 15, 'buah'],
-        ['Asam jawa', 30, 'g'],
-        ['Air es', 200, 'ml'],
-        ['Garam', 1.5, 'sdt']
+        ['Daging ikan tenggiri giling', 500, 'g'],
+        ['Tepung sagu / tapioka', 350, 'g'],
+        ['Telur bebek untuk isian', 4, 'butir'],
+        ['Air es', 250, 'ml'],
+        ['Garam halus', 1.5, 'sdm'],
+        ['Gula aren hitam', 300, 'g'],
+        ['Asam jawa', 50, 'g'],
+        ['Bawang putih', 50, 'g'],
+        ['Cabai rawit hijau', 30, 'g']
       ],
       t: [
-        'Uleni ikan tenggiri dingin dengan air es dan garam hingga adonan mengembang kenyal.',
-        'Campur tepung sagu perlahan bertahap tanpa diuleni terlalu keras.',
-        'Bentuk adonan menjadi mangkuk kantong, isi dengan sebutir telur mentah, lalu rekatkan tepi adonan rapat.',
-        'Rebus dalam air mendidih hingga mengapung matang, goreng sesaat sebelum disajikan bersama cuko hitam kental.'
+        'Campur ikan tenggiri giling dengan air es dan garam, aduk searah hingga adonan mengental kenyal.',
+        'Masukkan tepung sagu bertahap sambil diuleni ringan agar pempek tidak menjadi keras saat matang.',
+        'Bentuk adonan menjadi kantong lonjong, masukkan telur bebek mentah, lalu rekatkan rapat ujungnya.',
+        'Rebus pempek dalam air mendidih banyak hingga terapung matang, angkat dan tiriskan.',
+        'Goreng pempek hingga keemasan lalu sajikan bersama kuah cuko kental pedas asam segar.'
       ]
     },
     {
       id: 5,
-      n: 'Soto Ayam Lamongan',
+      n: 'Soto Lamongan',
       p: 'Jawa Timur',
       k: ['Makanan Berat', 'Anak Kos'],
       w: 60,
       l: 'Sedang',
       s: 4,
       r: 4.8,
-      rc: 31,
+      rc: 34,
       f: 'img/soto-lamongan.jpg',
       u: 'Tim FoodHub',
-      c: 'Soto ayam berkuah kuning bening gurih segar dengan taburan bubuk koya gurih renyah dari kerupuk udang dan bawang putih.',
+      c: 'Soto ayam berkuah kuning bening gurih khas pesisir Jawa Timur dengan ciri khas taburan bubuk koya renyah gurih.',
+      is_published: true,
       b: [
-        ['Ayam kampung', 600, 'g'],
-        ['Bawang putih', 6, 'siung'],
-        ['Bawang merah', 8, 'siung'],
-        ['Kunyit bakar', 3, 'ruas'],
-        ['Kemiri sangrai', 4, 'butir'],
-        ['Serai', 2, 'batang'],
-        ['Daun jeruk', 4, 'lembar'],
-        ['Kerupuk udang goreng', 50, 'g'],
-        ['Soun seduh', 80, 'g'],
-        ['Garam', 2, 'sdt'],
-        ['Air', 1800, 'ml']
+        ['Ayam kampung', 1, 'ekor'],
+        ['Kerupuk udang goreng', 5, 'buah'],
+        ['Bawang putih goreng', 4, 'siung'],
+        ['Serai dan daun salam', 2, 'batang'],
+        ['Kunyit dan jahe', 2, 'ruas'],
+        ['Soun seduh', 100, 'g'],
+        ['Telur rebus', 3, 'butir'],
+        ['Tauge pendek', 100, 'g'],
+        ['Garam dan merica', 1.5, 'sdt']
       ],
       t: [
-        'Rebus ayam kampung bersama serai dan daun jeruk hingga kaldu bening terbentuk, suwir daging ayamnya.',
-        'Haluskan bawang putih, bawang merah, kunyit, dan kemiri lalu tumis hingga matang harum.',
-        'Masukkan bumbu tumis ke dalam kuah kaldu rebusan, bumbui garam, dan didihkan hingga meresap gurih.',
-        'Tumbuk kerupuk udang goreng bersama bawang putih goreng untuk bubuk koya, taburkan di atas mangkuk soto hangat.'
+        'Rebus ayam bersama serai, daun jeruk, dan daun salam hingga keluar kaldu ayam bening gurih.',
+        'Tumis bumbu halus kuning hingga matang berminyak, masukkan ke dalam panci kaldu mendidih.',
+        'Angkat ayam, tiriskan, lalu goreng sebentar hingga permukaan berkulit kecokelatan dan suwir-suwir.',
+        'Tumbuk halus kerupuk udang bersama bawang putih goreng renyah untuk membuat bubuk koya gurih.',
+        'Tata soun, tauge, telur rebus, dan suwiran ayam di mangkuk, siram kuah panas dan beri koya melimpah.'
       ]
     },
     {
       id: 6,
-      n: 'Rawon Daging Sapi',
+      n: 'Rawon',
       p: 'Jawa Timur',
       k: ['Makanan Berat'],
       w: 90,
       l: 'Sedang',
       s: 5,
-      r: 4.8,
-      rc: 29,
+      r: 4.9,
+      rc: 31,
       f: 'img/rawon.jpg',
       u: 'Tim FoodHub',
-      c: 'Sup daging sapi khas Jawa Timur berwarna hitam pekat dari kluwek matang, disajikan bersama sambal terasi dan tauge pendek segar.',
+      c: 'Sup daging sapi hitam pekat khas Jawa Timur berbumbu rempah kluwek matang yang gurih harum menggugah selera.',
+      is_published: true,
       b: [
-        ['Daging sapi sandung lamur', 600, 'g'],
-        ['Kluwek tua hitam', 5, 'buah'],
+        ['Daging sapi sandung lamur', 500, 'g'],
+        ['Kluwek tua pilihan', 5, 'buah'],
         ['Bawang merah', 8, 'siung'],
         ['Bawang putih', 5, 'siung'],
-        ['Lengkuas', 3, 'cm'],
-        ['Serai', 2, 'batang'],
+        ['Serai memarkan', 2, 'batang'],
         ['Daun jeruk purut', 4, 'lembar'],
         ['Tauge pendek segar', 100, 'g'],
-        ['Telur asin', 3, 'butir'],
-        ['Garam', 2, 'sdt']
+        ['Sambal terasi', 2, 'sdm'],
+        ['Garam', 1.5, 'sdt']
       ],
       t: [
-        'Rendam isi buah kluwek tua dengan air panas lalu haluskan bersama bawang merah, bawang putih, dan ketumbar.',
-        'Tumis bumbu halus kluwek bersama serai, lengkuas, dan daun jeruk hingga aroma khas keluar.',
-        'Masukkan potongan daging sapi, aduk hingga berubah warna lalu tuang air kaldu dan masak hingga empuk.',
-        'Sajikan rawon hitam gurih dengan taburan tauge pendek mentah, telur asin, dan sambal terasi pedas.'
+        'Keluarkan isi kluwek dari cangkangnya, rendam air hangat lalu haluskan bersama bawang dan rempah bumbu.',
+        'Tumis bumbu kluwek halus bersama serai dan daun jeruk purut hingga benar-benar harum matang.',
+        'Rebus potongan daging sapi sandung lamur hingga empuk meresap, tuang bumbu tumis ke panci kaldu.',
+        'Masak api kecil agar kuah hitam meresap kuat ke serat daging sapi.',
+        'Sajikan hangat bersama nasi putih, tauge pendek segar, telur asin, dan sambal terasi terpisah.'
       ]
     },
     {
@@ -375,27 +320,27 @@
       l: 'Sulit',
       s: 6,
       r: 4.7,
-      rc: 24,
+      rc: 28,
       f: 'img/gudeg.jpg',
       u: 'Tim FoodHub',
-      c: 'Nangka muda dimasak perlahan berjam-jam dengan santan kental, gula aren murni, dan daun jati hingga cokelat kemerahan manis legit.',
+      c: 'Olahan nangka muda manis gurih khas Keraton Yogyakarta yang dimasak perlahan berjam-jam dengan santan dan gula aren.',
+      is_published: true,
       b: [
-        ['Nangka muda cacah', 1000, 'g'],
-        ['Santan kental kelapa', 1000, 'ml'],
-        ['Gula merah kelapa aren', 150, 'g'],
-        ['Bawang merah', 10, 'siung'],
+        ['Nangka muda cacah kasar', 1000, 'g'],
+        ['Gula aren kelapa murni', 250, 'g'],
+        ['Santan kental kelapa', 1200, 'ml'],
+        ['Daun jati untuk warna alami', 5, 'lembar'],
+        ['Ketumbar sangrai', 2, 'sdm'],
+        ['Bawang merah', 12, 'siung'],
         ['Bawang putih', 6, 'siung'],
-        ['Ketumbar bubuk', 1, 'sdm'],
-        ['Daun salam segar', 6, 'lembar'],
-        ['Lengkuas memarkan', 50, 'g'],
-        ['Telur rebus kupas', 6, 'butir'],
-        ['Garam', 1.5, 'sdt']
+        ['Kemiri sangrai', 6, 'butir'],
+        ['Telur rebus', 6, 'butir']
       ],
       t: [
-        'Alasi dasar panci dengan daun salam dan potongan lengkuas memar.',
-        'Tata nangka muda, telur rebus kupas, bumbu halus bawang dan ketumbar, serta sisiran gula merah.',
-        'Tuang santan kelapa perlahan, masak di atas api kecil berjam-jam hingga air santan mengering meresap.',
-        'Biarkan gudeg mengendap semalaman agar warna cokelat kemerahan makin pekat dan bumbu manis legit makin mantap.'
+        'Alasi dasar panci tebal dengan daun jati agar gudeg menghasilkan warna cokelat kemerahan alami cantik.',
+        'Tata potongan nangka muda, telur rebus, bumbu halus, santan kental, dan gula aren secara merata.',
+        'Masak dengan api sangat kecil selama minimal 4 hingga 5 jam hingga kuah santan mengering meresap sempurna.',
+        'Sajikan bersama sambal krecek pedas gurih, opor ayam suwir, dan areh santan kental gurih.'
       ]
     },
     {
@@ -407,26 +352,27 @@
       l: 'Sedang',
       s: 4,
       r: 4.8,
-      rc: 22,
+      rc: 27,
       f: 'img/sate-lilit.jpg',
       u: 'Tim FoodHub',
-      c: 'Cincangan daging ikan tenggiri lembut berpadu parutan kelapa muda dan rempah base genep khas Bali, dililitkan di batang serai harum.',
+      c: 'Cincangan daging ikan tenggiri lembut berpadu parutan kelapa muda dan rempah base genep Bali, dililitkan di batang serai harum.',
+      is_published: true,
       b: [
-        ['Daging ikan tenggiri cincang', 500, 'g'],
-        ['Kelapa parut setengah tua', 120, 'g'],
-        ['Bawang merah', 8, 'siung'],
-        ['Bawang putih', 5, 'siung'],
-        ['Kencur', 3, 'cm'],
-        ['Kunyit bakar', 3, 'cm'],
-        ['Cabai rawit merah', 6, 'buah'],
-        ['Batang serai segar', 10, 'batang'],
-        ['Garam', 1, 'sdt']
+        ['Daging ikan tenggiri cincang', 400, 'g'],
+        ['Kelapa parut setengah tua', 150, 'g'],
+        ['Batang serai segar tebal', 12, 'batang'],
+        ['Bawang merah', 6, 'siung'],
+        ['Bawang putih', 4, 'siung'],
+        ['Cabai merah keriting', 4, 'buah'],
+        ['Kunyit bakar', 2, 'ruas'],
+        ['Santan kental', 50, 'ml'],
+        ['Garam dan gula kelapa', 1, 'sdt']
       ],
       t: [
-        'Haluskan bumbu base genep (bawang, kencur, kunyit, cabai) lalu tumis sebentar sampai harum.',
-        'Campur daging ikan cincang, kelapa parut, bumbu tumis, dan garam hingga adonan liat kalis.',
-        'Lilitkan adonan pada ujung batang serai segar hingga padat membulat.',
-        'Panggang di atas bara api atau wajan datar hingga sate harum kekuningan matang merata.'
+        'Haluskan bumbu base genep lalu tumis sebentar dengan sedikit minyak hingga harum berminyak matang.',
+        'Campurkan ikan cincang, kelapa parut setengah tua, bumbu tumis, dan santan kental hingga adonan kalis lembut.',
+        'Ambil sedikit adonan, tempelkan dan lilitkan padat merata mengelilingi ujung batang serai harum.',
+        'Panggang sate lilit di atas pemanggang arang atau wajan datar anti lengket sambil dibalik perlahan hingga matang kecokelatan.'
       ]
     },
     {
@@ -437,28 +383,28 @@
       w: 120,
       l: 'Sedang',
       s: 5,
-      r: 4.8,
-      rc: 25,
+      r: 4.9,
+      rc: 29,
       f: 'img/ayam-betutu.jpg',
       u: 'Tim FoodHub',
       c: 'Ayam kampung utuh berbalur rempah bumbu genep komplit pedas gurih, dibungkus daun pisang lalu dipanggang matang meresap.',
+      is_published: true,
       b: [
-        ['Ayam kampung utuh', 1, 'ekor'],
-        ['Bawang merah cincang', 12, 'siung'],
-        ['Bawang putih cincang', 6, 'siung'],
-        ['Kencur cincang', 4, 'ruas'],
-        ['Kunyit cincang', 3, 'ruas'],
-        ['Lengkuas cincang', 4, 'cm'],
-        ['Cabai rawit merah iris', 15, 'buah'],
-        ['Minyak kelapa murni', 4, 'sdm'],
-        ['Daun pisang pembungkus', 3, 'lembar'],
-        ['Garam', 2, 'sdt']
+        ['Ayam kampung utuh bersih', 1, 'ekor'],
+        ['Bawang merah rajang halus', 15, 'siung'],
+        ['Bawang putih cincang', 8, 'siung'],
+        ['Cabai rawit merah iris', 20, 'buah'],
+        ['Kencur parut', 3, 'ruas'],
+        ['Jahe dan lengkuas cincang', 3, 'ruas'],
+        ['Kunyit bakar haluskan', 2, 'ruas'],
+        ['Minyak kelapa asli', 4, 'sdm'],
+        ['Daun pisang untuk membungkus', 3, 'lembar']
       ],
       t: [
-        'Campurkan bumbu cincang genep dengan minyak kelapa dan garam hingga merata.',
-        'Balurkan bumbu ke seluruh bagian ayam kampung luar dan rongga dalam.',
-        'Bungkus rapat ayam berbumbu dengan daun pisang berlapis.',
-        'Kukus selama 45 menit lalu panggang hingga bumbu mengering harum dan daging ayam sangat empuk.'
+        'Tumis campuran bumbu rajang kasar base genep dengan minyak kelapa asli hingga harum semerbak gurih.',
+        'Balurkan bumbu tumis secara merata ke seluruh permukaan kulit ayam dan masukkan sebagian bumbu ke rongga dalam ayam.',
+        'Bungkus rapat ayam berlapis daun pisang segar dan aluminium foil agar aroma bumbu rempah terkunci.',
+        'Kukus ayam selama 45 menit lalu lanjutkan memanggang dalam oven atau bara sekam hingga bumbu mengering meresap.'
       ]
     },
     {
@@ -470,91 +416,90 @@
       l: 'Sedang',
       s: 4,
       r: 4.6,
-      rc: 16,
+      rc: 22,
       f: 'img/papeda.jpg',
       u: 'Tim FoodHub',
       c: 'Papeda sagu kenyal lembut khas pesisir timur Nusantara disiram sup ikan tongkol kuah kuning beraroma kemangi dan asam jeruk nipis.',
+      is_published: true,
       b: [
-        ['Tepung sagu murni', 250, 'g'],
-        ['Ikan tongkol segar', 500, 'g'],
-        ['Kunyit bakar', 4, 'ruas'],
-        ['Bawang merah', 6, 'siung'],
-        ['Bawang putih', 4, 'siung'],
-        ['Serai memarkan', 2, 'batang'],
-        ['Daun kemangi segar', 1, 'ikat'],
+        ['Tepung sagu murni basah', 200, 'g'],
+        ['Ikan tongkol segar potong', 500, 'g'],
+        ['Air mendidih untuk menyiram sagu', 600, 'ml'],
+        ['Kunyit segar haluskan', 3, 'ruas'],
+        ['Kemangi segar', 2, 'ikat'],
         ['Jeruk nipis peras', 2, 'buah'],
-        ['Garam', 1.5, 'sdt'],
-        ['Air mendidih', 1200, 'ml']
+        ['Cabai rawit utuh', 8, 'buah'],
+        ['Bawang merah dan bawang putih', 6, 'siung'],
+        ['Garam', 1.5, 'sdt']
       ],
       t: [
-        'Larutkan sagu dengan sedikit air dingin dan perasan jeruk nipis di wadah baskom.',
-        'Tuangkan air mendidih sambil diaduk cepat satu arah hingga sagu berubah bening kental elastis.',
-        'Tumis bumbu halus kunyit dan serai, tambahkan air kaldu dan potongan ikan tongkol segar.',
-        'Masak hingga ikan matang, masukkan daun kemangi dan jeruk nipis, sajikan bersama papeda hangat.'
+        'Larutkan tepung sagu dengan air dingin sedikit, lalu siram air mendidih mendidih sambil diaduk cepat searah hingga menjadi bubur bening kenyal.',
+        'Tumis bumbu kuning hingga harum, tuangkan air kaldu dan masukkan potongan ikan tongkol segar.',
+        'Masak ikan kuah kuning hingga matang, masukkan cabai rawit utuh, daun kemangi segar, dan perasan air jeruk nipis sesaat sebelum diangkat.',
+        'Sajikan papeda kenyal dengan cara digulung memakai sumpit lalu siramkan kuah kuning ikan hangat melimpah.'
       ]
     },
     {
       id: 11,
-      n: 'Gado-Gado Betawi',
+      n: 'Gado-Gado',
       p: 'DKI Jakarta',
       k: ['Sehat', 'Makanan Berat', 'Cepat'],
       w: 35,
       l: 'Mudah',
       s: 3,
       r: 4.7,
-      rc: 20,
-      v: 1,
+      rc: 26,
       f: 'img/gado-gado.jpg',
       u: 'Tim FoodHub',
       c: 'Salad tradisional Betawi dari aneka sayuran rebus segar, tahu tempe goreng, disiram saus kacang tanah legit gurih beraroma limau.',
+      is_published: true,
       b: [
-        ['Kacang tanah goreng giling', 200, 'g'],
-        ['Kentang kukus potong', 2, 'buah'],
-        ['Kol iris rebus', 100, 'g'],
-        ['Tauge rebus sebentar', 100, 'g'],
-        ['Kacang panjang rebus', 100, 'g'],
-        ['Tahu dan tempe goreng', 4, 'potong'],
+        ['Kacang tanah goreng giling halus', 250, 'g'],
+        ['Gula merah aren sisir', 50, 'g'],
+        ['Santan encer matang', 200, 'ml'],
+        ['Kangkung dan tauge rebus', 150, 'g'],
+        ['Kacang panjang potong rebus', 100, 'g'],
+        ['Tahu dan tempe goreng potong', 150, 'g'],
         ['Telur rebus belah dua', 2, 'butir'],
-        ['Gula merah aren', 40, 'g'],
-        ['Air asam jawa', 2, 'sdm'],
-        ['Jeruk limau', 2, 'buah'],
-        ['Garam', 1, 'sdt']
+        ['Jeruk limau peras', 2, 'buah'],
+        ['Kerupuk emping melinjo', 50, 'g']
       ],
       t: [
-        'Haluskan cabai, bawang putih goreng, garam, dan gula merah di atas cobek.',
-        'Campur kacang tanah halus dengan air hangat dan asam jawa, uleg hingga menjadi saus kacang kental.',
-        'Beri perasan jeruk limau segar pada saus kacang agar wangi.',
-        'Tata sayuran rebus, tahu, tempe, dan telur rebus, siramkan saus kacang dan beri taburan emping.'
+        'Masak kacang giling bersama santan encer, gula aren sisir, cabai, dan garam hingga meletup kental berminyak wangi.',
+        'Beri perasan air jeruk limau harum ke dalam saus kacang hangat untuk aroma segar khas Betawi.',
+        'Tata aneka sayuran rebus, kentang rebus, potongan tahu, dan tempe goreng renyah di piring saji lebar.',
+        'Siram saus kacang melimpah di atas sayuran lalu taburi bawang goreng garing dan kerupuk emping renyah.'
       ]
     },
     {
       id: 12,
-      n: 'Es Cendol Dawet',
+      n: 'Es Cendol',
       p: 'Jawa Tengah',
       k: ['Minuman', 'Cepat'],
       w: 40,
       l: 'Sedang',
       s: 4,
-      r: 4.6,
-      rc: 21,
-      v: 1,
+      r: 4.9,
+      rc: 33,
       f: 'img/es-cendol.jpg',
       u: 'Tim FoodHub',
       c: 'Minuman es tradisional Jawa dengan cendol pandan hijau kenyal, siraman santan gurih segar, dan kinca gula kelapa nangka wangi.',
+      is_published: true,
       b: [
-        ['Tepung beras', 120, 'g'],
-        ['Air pandan suji', 500, 'ml'],
-        ['Santan kelapa matang', 400, 'ml'],
-        ['Gula merah aren', 200, 'g'],
-        ['Buah nangka matang', 50, 'g'],
-        ['Es batu serut', 300, 'g'],
-        ['Garam', 0.5, 'sdt']
+        ['Tepung beras dan tepung hunkwe', 100, 'g'],
+        ['Air daun pandan suji harum', 500, 'ml'],
+        ['Gula merah aren kelapa', 250, 'g'],
+        ['Santan kelapa segar rebus', 400, 'ml'],
+        ['Nangka matang potong dadu', 5, 'butir'],
+        ['Es batu serut secukupnya', 300, 'g'],
+        ['Garam halus', 0.5, 'sdt']
       ],
       t: [
-        'Masak tepung beras dan air pandan sambil diaduk sampai meletup-letup kental bening.',
-        'Cetak adonan cendol panas di atas wadah berisi air es.',
-        'Rebus gula merah aren bersama potongan nangka harum menjadi sirup kinca manis.',
-        'Sajikan cendol dalam gelas bersama sirup kinca, es batu serut, dan siraman santan gurih.'
+        'Masak larutan tepung beras dan sari pandan suji sambil diaduk rapat hingga mengental meletup bening kenyal.',
+        'Cetak adonan hangat di atas saringan cendol langsung ke dalam wadah berisi air es agar cendol memadat kenyal.',
+        'Rebus gula aren bersama daun pandan wangi dan potongan buah nangka hingga menjadi sirup kinca kental harum.',
+        'Rebus santan segar dengan sejumput garam dan daun pandan hingga matang wangi lalu dinginkan.',
+        'Susun sirup gula merah nangka, cendol pandan hijau, es serut dingin, lalu siram santan gurih di atasnya.'
       ]
     },
     {
@@ -566,25 +511,26 @@
       l: 'Sedang',
       s: 4,
       r: 4.8,
-      rc: 27,
+      rc: 25,
       f: 'img/nasi-liwet.jpg',
       u: 'Tim FoodHub',
       c: 'Nasi gurih harum berbalur santan dan rempah daun salam, disajikan hangat dengan suwiran ayam opor lembut, sayur labu siam, dan areh santan.',
+      is_published: true,
       b: [
-        ['Beras pulen', 450, 'g'],
-        ['Santan kelapa', 700, 'ml'],
-        ['Daun salam segar', 4, 'lembar'],
+        ['Beras pulen cuci bersih', 500, 'g'],
+        ['Santan kelapa gurih', 750, 'ml'],
         ['Serai memarkan', 2, 'batang'],
-        ['Daging ayam suwir opor', 200, 'g'],
-        ['Labu siam iris korek', 150, 'g'],
-        ['Santan areh kental gurih', 100, 'ml'],
+        ['Daun salam segar', 4, 'lembar'],
+        ['Ayam suwir opor gurih', 200, 'g'],
+        ['Labu siam iris korek api tumis', 200, 'g'],
+        ['Areh santan kental putih', 100, 'ml'],
         ['Garam', 1.5, 'sdt']
       ],
       t: [
-        'Cuci beras bersih, masak bersama santan, daun salam, serai, dan garam hingga santan terserap (aron).',
-        'Tutup rapat panci liwet dan masak dengan api kecil hingga nasi tanak pulen beraroma harum gurih.',
-        'Masak sayur labu siam kuah santan pedas gurih untuk pendamping.',
-        'Sajikan nasi liwet di pincuk daun pisang dengan suwiran ayam opor, sayur labu siam, dan areh santan kental.'
+        'Masak beras bersama santan, serai memarkan, daun salam harum, dan garam di panci tebal atau rice cooker hingga nasi tanak gurih.',
+        'Masak tumis sayur labu siam pedas gurih berkuah santan encer hingga empuk meresap.',
+        'Rebus santan kental dengan sedikit garam di api sangat kecil hingga menghasilkan gumpalan minyak areh gurih.',
+        'Pincuk daun pisang, beri nasi liwet hangat, beri sayur labu siam, suwiran ayam opor lembut, dan siraman sesendok areh gurih.'
       ]
     },
     {
@@ -595,35 +541,32 @@
       w: 90,
       l: 'Sedang',
       s: 5,
-      r: 4.8,
-      rc: 34,
+      r: 4.9,
+      rc: 30,
       f: 'img/soto-makassar.jpg',
       u: 'Tim FoodHub',
       c: 'Sup daging sapi khas Makassar berkuah kaldu pekat gurih berbumbu rempah kacang tanah sangrai, disajikan bersama ketupat daun kelapa.',
+      is_published: true,
       b: [
-        ['Daging sapi sandung lamur', 700, 'g'],
+        ['Daging sapi sengkel dan babat', 600, 'g'],
         ['Kacang tanah sangrai giling halus', 150, 'g'],
-        ['Bawang merah', 10, 'siung'],
-        ['Bawang putih', 6, 'siung'],
-        ['Serai memarkan', 3, 'batang'],
-        ['Lengkuas memarkan', 30, 'g'],
-        ['Ketumbar sangrai', 1, 'sdm'],
-        ['Jintan sangrai', 0.5, 'sdt'],
-        ['Air tajin cucian beras', 1800, 'ml'],
-        ['Garam', 2, 'sdt']
+        ['Air cucian beras putih (tajin)', 1500, 'ml'],
+        ['Serai dan lengkuas memarkan', 3, 'batang'],
+        ['Ketumbar dan jintan sangrai', 2, 'sdm'],
+        ['Bawang merah dan bawang putih', 10, 'siung'],
+        ['Kayu manis dan cengkih', 2, 'butir'],
+        ['Garam dan gula', 1.5, 'sdt']
       ],
       t: [
-        'Rebus daging sapi dalam air tajin bersama serai dan lengkuas sampai empuk, potong dadu.',
-        'Haluskan bumbu rempah lalu tumis hingga harum semerbak berminyak.',
-        'Masukkan bumbu tumisan dan gilingan kacang tanah sangrai ke kuah rebusan daging.',
-        'Masak hingga kuah mengental gurih berminyak. Sajikan panas bersama ketupat, irisan daun seledri, dan perasan jeruk nipis.'
+        'Rebus daging sapi dalam air tajin (cucian beras) bersama serai dan lengkuas hingga daging empuk dan kaldu mengental gurih.',
+        'Haluskan bumbu rempah aromatik lalu tumis hingga harum berminyak dan matang sempurna.',
+        'Tuangkan bumbu tumis ke dalam panci rebusan kaldu daging, lalu masukkan kacang tanah sangrai giling halus.',
+        'Aduk perlahan hingga kuah mengental kecokelatan gurih pekat beraroma khas Coto Makassar.',
+        'Potong dadu daging sapi empuk, tata di mangkuk, siram kuah panas mendidih, beri daun bawang, seledri, dan perasan jeruk nipis.'
       ]
     }
   ];
 
-  /* ==========================================================================
-     Helper Data & Fungsi Utilitas
-     ========================================================================== */
   const cats = () => ['Makanan Berat', 'Sehat', 'Minuman', 'Cepat', 'Anak Kos'];
   const hid = () => ld('fh_hid', []);
   const recipesList = () => {
@@ -636,9 +579,8 @@
   };
   const saveRecipes = list => sv('fh_recipes', list);
   const all = () => recipesList().filter(r => !hid().includes(r.id));
-  const byId = id => recipesList().filter(r => String(r.id) === String(id))[0];
+  const byId = id => recipesList().find(r => String(r.id) === String(id));
   const rvAll = () => ld('fh_rv', {});
-
   const rat = r => {
     const v = rvAll()[r.id] || [];
     const n = (r.rc || 0) + v.length;
@@ -648,24 +590,70 @@
     return { a: s / n, n };
   };
 
-  const starTxt = a => '★'.repeat(Math.round(a)) + '☆'.repeat(5 - Math.round(a));
-  const hue = id => String(id).split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 5;
-  const fmt = n => (Math.round(n * 100) / 100).toLocaleString('id-ID', { maximumFractionDigits: 2 });
-  const tags = r => (r.p ? `<span class="tag r">${esc(r.p)}</span>` : '') + r.k.map(k => `<span class="tag">${esc(k)}</span>`).join('');
-  const thumb = r => `<div class="thumb c${hue(r.id)}">${r.f ? `<img src="${R + esc(r.f)}" alt="${esc(r.n)}">` : ic('bowl')}</div>`;
+  /* Sesi Lokal */
+  const sess = () => {
+    try {
+      const v = sessionStorage.getItem('fh_s') || localStorage.getItem('fh_s');
+      return v ? JSON.parse(v) : null;
+    } catch (e) { return null; }
+  };
+  const setSess = (u, keep) => {
+    try {
+      sessionStorage.removeItem('fh_s');
+      localStorage.removeItem('fh_s');
+      (keep ? localStorage : sessionStorage).setItem('fh_s', JSON.stringify({ email: u.email }));
+    } catch (e) {}
+  };
+  const endSess = () => {
+    try {
+      sessionStorage.removeItem('fh_s');
+      localStorage.removeItem('fh_s');
+    } catch (e) {}
+  };
+  const users = () => {
+    let u = ld('fh_users', null);
+    if (!u) {
+      u = [
+        { name: 'Admin FoodHub', email: 'admin@foodhub.id', pass: 'admin123', role: 'admin', fav: [], at: '2026-08-01' },
+        { name: 'Raka Pratama', email: 'raka@contoh.id', pass: 'rahasia123', role: 'member', fav: [1, 2], at: '2026-09-12' },
+        { name: 'Nadia Putri', email: 'nadia@contoh.id', pass: 'rahasia123', role: 'member', fav: [3], at: '2026-10-03' }
+      ];
+      sv('fh_users', u);
+    }
+    return u;
+  };
+  const me = () => {
+    const s = sess();
+    return s ? (users().find(x => x.email === s.email) || null) : null;
+  };
 
+  let U = null;
+
+  /* ==========================================================================
+     Tampilan Kartu Resep (Sesuai Foto 1: 3 kartu sebaris, foto 240px, deskripsi)
+     ========================================================================== */
   function card(r) {
-    const t = rat(r);
+    const title = esc(r.title || r.n);
+    const desc = esc(r.story || r.c || '');
+    const time = r.cook_time_minutes || r.w || 30;
+    const diff = esc(r.difficulty ? (r.difficulty.charAt(0).toUpperCase() + r.difficulty.slice(1)) : (r.l || 'Sedang'));
+    const ratingVal = r.avg_rating != null ? r.avg_rating : (rat(r) ? rat(r).a : null);
+    const ratingTxt = ratingVal ? ('★ ' + Number(ratingVal).toFixed(1)) : 'Belum ada rating';
+    const imgFile = r.image_path || r.f || '';
+    const imgUrl = imgFile ? (R + esc(imgFile)) : '';
+
     return `
       <a class="card" href="${R}detail-resep.html?id=${encodeURIComponent(r.id)}">
-        ${thumb(r)}
+        <div class="thumb">
+          ${imgUrl ? `<img src="${imgUrl}" alt="${title}">` : ic('bowl')}
+        </div>
         <div class="cb">
-          <h3>${esc(r.n)}</h3>
-          ${r.c ? `<p class="desc">${esc(r.c)}</p>` : ''}
+          <h3>${title}</h3>
+          ${desc ? `<p class="desc">${desc}</p>` : ''}
           <div class="meta">
-            <span>${ic('clock')} ${r.w} mnt</span>
-            <span>${esc(r.l)}</span>
-            <span class="gold">${t ? '★ ' + t.a.toFixed(1) : 'Belum ada rating'}</span>
+            <span>${ic('clock')} ${time} mnt</span>
+            <span>${diff}</span>
+            <span class="gold">${ratingTxt}</span>
           </div>
         </div>
       </a>
@@ -677,7 +665,7 @@
   };
 
   /* ==========================================================================
-     Komponen Bersama: Navigasi, Footer, Sidebar Admin & Tabs
+     Komponen Bersama: Navigasi, Footer, Sidebar Admin
      ========================================================================== */
   function buildNav() {
     const L = [
@@ -685,9 +673,7 @@
       ['daftar-resep', 'Resep'],
       ['faq', 'FAQ']
     ];
-    const cur = {
-      'detail-resep': 'daftar-resep'
-    }[P] || P;
+    const cur = { 'detail-resep': 'daftar-resep' }[P] || P;
 
     const links = L.map(l => `
       <a href="${R}${l[0]}.html"${l[0] === cur ? ' class="on" aria-current="page"' : ''}>${l[1]}</a>
@@ -714,48 +700,59 @@
 
     $('#nav').innerHTML = `
       <div class="container nb">
-        <a class="logo" href="${R}index.html" aria-label="FoodHub, ke beranda">
+        <a class="logo" href="${R}index.html" aria-label="Beranda FoodHub">
           <img src="${R}img/logo-foodhub.jpg" alt="FoodHub">
         </a>
-        <button class="burger" id="bg" type="button" aria-label="Buka menu" aria-expanded="false">
+        <button class="burger" id="bg" aria-label="Buka menu navigasi" aria-expanded="false">
           ${ic('menu')}
         </button>
-        <nav class="nl" id="nl" aria-label="Navigasi utama">
-          ${links}
-          <div class="na">${auth}</div>
-        </nav>
+        <nav class="nl" id="nl" aria-label="Navigasi utama">${links}</nav>
+        <div class="na">${auth}</div>
       </div>
     `;
 
     $('#bg').addEventListener('click', () => {
-      const o = $('#nl').classList.toggle('open');
-      $('#bg').setAttribute('aria-expanded', o);
+      const open = $('#nl').classList.toggle('open');
+      $('#bg').setAttribute('aria-expanded', String(open));
     });
 
-    if (U) {
-      const b = $('#avb');
-      const d = $('#dd');
-      b.addEventListener('click', e => {
+    const av = $('#avb');
+    if (av) {
+      av.addEventListener('click', e => {
         e.stopPropagation();
-        d.hidden = !d.hidden;
-        b.setAttribute('aria-expanded', !d.hidden);
+        const d = $('#dd');
+        const open = !d.hidden;
+        d.hidden = open;
+        av.setAttribute('aria-expanded', String(!open));
       });
-      document.addEventListener('click', e => {
-        if (!d.contains(e.target)) {
-          d.hidden = true;
-          b.setAttribute('aria-expanded', 'false');
-        }
+      document.addEventListener('click', () => {
+        const d = $('#dd');
+        if (d) d.hidden = true;
+        if (av) av.setAttribute('aria-expanded', 'false');
       });
-      document.addEventListener('keydown', e => {
-        if (e.key === 'Escape') d.hidden = true;
-      });
-      $('#lo').addEventListener('click', () => {
+    }
+
+    const lo = $('#lo');
+    if (lo) {
+      lo.addEventListener('click', async () => {
+        try { await api('auth.php?action=logout', { method: 'POST' }); } catch (e) {}
         endSess();
         location.href = R + 'index.html';
       });
     }
 
-    $('#foot').innerHTML = `
+    buildFoot();
+  }
+
+  function buildFoot() {
+    const f = $('#foot');
+    if (!f) return;
+    const L = [
+      ['index', 'Beranda'],
+      ['daftar-resep', 'Resep'],
+      ['faq', 'FAQ']
+    ];
+    f.innerHTML = `
       <div class="container fb">
         <a href="${R}index.html">
           <img src="${R}img/logo-foodhub.jpg" alt="FoodHub">
@@ -793,11 +790,12 @@
         ${ic('menu')}
       </button>
       <strong>Panel Admin</strong>
-      <span class="muted">${esc(U.name)}</span>
+      <span class="muted">${esc(U ? U.name : 'Admin')}</span>
     `;
 
     $('#sbt').addEventListener('click', () => $('#side').classList.toggle('open'));
-    $('#alo').addEventListener('click', () => {
+    $('#alo').addEventListener('click', async () => {
+      try { await api('auth.php?action=logout', { method: 'POST' }); } catch (e) {}
       endSess();
       location.href = R + 'index.html';
     });
@@ -805,8 +803,7 @@
 
   function buildTabs() {
     const t = $('#tabs');
-    if (!t) return;
-    t.remove();
+    if (t) t.remove();
   }
 
   const bar = (el, m, ok) => {
@@ -818,23 +815,71 @@
   const list = a => `<ul>${a.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`;
 
   /* ==========================================================================
-     Router Logika Halaman (PG)
+     Inisialisasi Sesi & Proteksi Akses
+     ========================================================================== */
+  async function initAuth() {
+    try {
+      const res = await api('auth.php?action=me');
+      U = res.user || null;
+      if (U) setSess(U, true);
+      else endSess();
+    } catch (e) {
+      // Offline fallback
+      U = me();
+    }
+
+    if (ACC === 'member' && !U) {
+      location.replace(R + 'masuk.html?next=' + encodeURIComponent(location.pathname.split('/').pop() + location.search));
+      return false;
+    }
+
+    if (ACC === 'admin') {
+      if (!U) {
+        location.replace(R + 'masuk.html?next=' + encodeURIComponent('admin/' + location.pathname.split('/').pop()));
+        return false;
+      }
+      if (U.role !== 'admin') {
+        location.replace(R + 'index.html');
+        return false;
+      }
+    }
+
+    if ($('#nav')) buildNav();
+    if ($('#side')) buildAdmin();
+    return true;
+  }
+
+  /* ==========================================================================
+     Router Logika Halaman (PG) Mengambil Data dari API
      ========================================================================== */
   const PG = {
-    index() {
-      $('#cats').innerHTML = '<a class="chip on" href="daftar-resep.html">Semua</a>' +
-        cats().map(c => `<a class="chip" href="daftar-resep.html?kat=${encodeURIComponent(c)}">${esc(c)}</a>`).join('');
+    async index() {
+      // Kategori
+      try {
+        const { categories } = await api('categories.php');
+        $('#cats').innerHTML = '<a class="chip on" href="daftar-resep.html">Semua</a>' +
+          categories.map(c => `<a class="chip" href="daftar-resep.html?kat=${encodeURIComponent(c.name)}">${esc(c.name)}</a>`).join('');
+      } catch (e) {
+        $('#cats').innerHTML = '<a class="chip on" href="daftar-resep.html">Semua</a>' +
+          cats().map(c => `<a class="chip" href="daftar-resep.html?kat=${encodeURIComponent(c)}">${esc(c)}</a>`).join('');
+      }
 
-      const top = all().slice().sort((x, y) => ((rat(y) || { a: 0 }).a) - ((rat(x) || { a: 0 }).a)).slice(0, 3);
-      $('#pop').innerHTML = top.map(card).join('');
+      // Resep Populer (3 kartu dalam 1 baris sesuai Foto 1)
+      try {
+        const { recipes } = await api('recipes.php?sort=popular&limit=3');
+        $('#pop').innerHTML = recipes.map(card).join('');
+      } catch (e) {
+        const top = all().slice().sort((x, y) => ((rat(y) || { a: 0 }).a) - ((rat(x) || { a: 0 }).a)).slice(0, 3);
+        $('#pop').innerHTML = top.map(card).join('');
+      }
 
-      $('#heroForm').addEventListener('submit', e => {
+      $('#heroForm')?.addEventListener('submit', e => {
         e.preventDefault();
         location.href = 'daftar-resep.html?q=' + encodeURIComponent($('#q').value.trim());
       });
     },
 
-    'daftar-resep'() {
+    async 'daftar-resep'() {
       const f = {
         q: $('#fq'),
         k: $('#fk'),
@@ -842,30 +887,61 @@
         l: $('#fl')
       };
 
-      f.k.innerHTML = '<option value="">Semua kategori</option>' +
-        cats().map(c => `<option>${esc(c)}</option>`).join('');
+      try {
+        const { categories } = await api('categories.php');
+        f.k.innerHTML = '<option value="">Semua kategori</option>' +
+          categories.map(c => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('');
+      } catch (e) {
+        f.k.innerHTML = '<option value="">Semua kategori</option>' +
+          cats().map(c => `<option>${esc(c)}</option>`).join('');
+      }
 
       f.q.value = qs.get('q') || '';
       f.k.value = qs.get('kat') || '';
 
-      const run = () => {
-        const q = f.q.value.trim().toLowerCase();
+      const run = async () => {
+        const q = f.q.value.trim();
+        const cat = f.k.value;
         const w = +f.w.value;
-        const L = all().filter(r => {
-          const matchQ = !q || (r.n + ' ' + (r.p || '') + ' ' + r.b.map(i => i[0]).join(' ')).toLowerCase().includes(q);
-          const matchK = !f.k.value || r.k.includes(f.k.value);
-          const matchW = !w || (w === 999 ? r.w > 60 : r.w <= w);
-          const matchL = !f.l.value || r.l === f.l.value;
-          return matchQ && matchK && matchW && matchL;
-        });
+        const l = f.l.value;
 
-        $('#cnt').textContent = `${L.length} resep ditemukan`;
-        $('#rl').innerHTML = L.length
-          ? L.map(card).join('')
-          : '<p class="empty">Tidak ada resep yang cocok. Ubah kata kunci atau longgarkan filter.</p>';
+        try {
+          const params = new URLSearchParams();
+          if (q) params.set('q', q);
+          if (cat) params.set('category', cat);
+          if (w && w !== 999) params.set('max_time', w);
+          if (l) params.set('difficulty', l.toLowerCase());
+          params.set('sort', 'popular');
+
+          const { recipes } = await api('recipes.php?' + params.toString());
+          $('#cnt').textContent = `${recipes.length} resep ditemukan`;
+          $('#rl').innerHTML = recipes.length
+            ? recipes.map(card).join('')
+            : '<p class="empty">Tidak ada resep yang cocok. Ubah kata kunci atau longgarkan filter.</p>';
+        } catch (e) {
+          const ql = q.toLowerCase();
+          const L = all().filter(r => {
+            const matchQ = !ql || (r.n + ' ' + (r.p || '') + ' ' + (r.b || []).map(i => Array.isArray(i) ? i[0] : (i.name || '')).join(' ')).toLowerCase().includes(ql);
+            const matchK = !cat || (r.k && r.k.includes(cat));
+            const matchW = !w || (w === 999 ? r.w > 60 : r.w <= w);
+            const matchL = !l || (r.l && r.l.toLowerCase() === l.toLowerCase());
+            return matchQ && matchK && matchW && matchL;
+          });
+
+          $('#cnt').textContent = `${L.length} resep ditemukan`;
+          $('#rl').innerHTML = L.length
+            ? L.map(card).join('')
+            : '<p class="empty">Tidak ada resep yang cocok. Ubah kata kunci atau longgarkan filter.</p>';
+        }
       };
 
-      Object.values(f).forEach(e => e.addEventListener('input', run));
+      ['input', 'change'].forEach(ev => {
+        f.q.addEventListener(ev, run);
+        f.k.addEventListener(ev, run);
+        f.w.addEventListener(ev, run);
+        f.l.addEventListener(ev, run);
+      });
+
       $('#fr').addEventListener('click', () => {
         f.q.value = '';
         f.k.value = '';
@@ -873,46 +949,69 @@
         f.l.value = '';
         run();
       });
+
       run();
     },
 
-    'detail-resep'() {
-      const r = byId(qs.get('id'));
+    async 'detail-resep'() {
+      const id = qs.get('id');
       const box = $('#dr');
-
-      if (!r || (hid().includes(r.id) && !(U && U.role === 'admin'))) {
-        box.innerHTML = `
-          <div class="empty">
-            <h2>Resep tidak ditemukan</h2>
-            <p>Resep ini tidak ada atau sedang disembunyikan admin.</p>
-            <a class="btn" href="daftar-resep.html">Lihat semua resep</a>
-          </div>
-        `;
+      if (!id) {
+        box.innerHTML = '<div class="empty"><h2>Resep tidak ditemukan</h2><a class="btn" href="daftar-resep.html">Lihat semua resep</a></div>';
         return;
       }
 
-      document.title = r.n + ' | FoodHub';
-      let sv_ = r.s;
+      let r = null;
+      try {
+        const res = await api('recipes.php?id=' + encodeURIComponent(id));
+        r = res.recipe;
+      } catch (e) {
+        r = byId(id);
+      }
+
+      if (!r) {
+        box.innerHTML = '<div class="empty"><h2>Resep tidak ditemukan</h2><a class="btn" href="daftar-resep.html">Lihat semua resep</a></div>';
+        return;
+      }
+
+      const title = r.title || r.n;
+      document.title = title + ' | FoodHub';
+      let sv_ = r.servings || r.s || 4;
+      const baseServings = r.servings || r.s || 4;
+      const ingredients = r.ingredients || (r.b || []).map(x => Array.isArray(x) ? { name: x[0], quantity: x[1], unit: x[2] } : x);
+      const steps = r.steps || r.t || [];
+      const reviews = r.reviews || (rvAll()[r.id] || []).map(v => ({ user_name: v.u || 'Pengguna', rating: v.s, comment: v.c, created_at: v.at }));
+      const story = r.story || r.c || '';
+      const cookTime = r.cook_time_minutes || r.w || 30;
+      const diff = r.difficulty ? (r.difficulty.charAt(0).toUpperCase() + r.difficulty.slice(1)) : (r.l || 'Sedang');
+      const author = r.author || r.u || 'Tim FoodHub';
+      const categories = r.categories || r.k || [];
+      let isFav = !!r.is_favorite;
 
       box.innerHTML = `
         <div class="crumb">
-          <a href="index.html">Beranda</a> / <a href="daftar-resep.html">Resep</a> / ${esc(r.n)}
+          <a href="index.html">Beranda</a> / <a href="daftar-resep.html">Resep</a> / ${esc(title)}
         </div>
 
         <div class="dhead">
-          ${thumb(r)}
+          ${card({ ...r, n: title, story, c: story }).match(/<div class="thumb[\s\S]*?<\/div>/)?.[0] || thumb(r)}
           <div>
-            <div class="tags">${tags(r)}</div>
-            <h1>${esc(r.n)}</h1>
-            <p class="muted">Oleh ${esc(r.u || 'Tim FoodHub')}</p>
+            <div class="tags">
+              ${r.region ? `<span class="tag r">${esc(r.region)}</span>` : (r.p ? `<span class="tag r">${esc(r.p)}</span>` : '')}
+              ${categories.map(k => `<span class="tag">${esc(k)}</span>`).join('')}
+            </div>
+            <h1>${esc(title)}</h1>
+            <p class="muted">Oleh ${esc(author)}</p>
             <div class="tiles">
-              <div class="tile"><b>${r.w} mnt</b><span>Waktu</span></div>
-              <div class="tile"><b>${esc(r.l)}</b><span>Tingkat</span></div>
-              <div class="tile"><b id="pt">${r.s}</b><span>Porsi</span></div>
-              <div class="tile"><b id="rt"></b><span>Rating</span></div>
+              <div class="tile"><b>${cookTime} mnt</b><span>Waktu</span></div>
+              <div class="tile"><b>${esc(diff)}</b><span>Tingkat</span></div>
+              <div class="tile"><b id="pt">${sv_}</b><span>Porsi</span></div>
+              <div class="tile"><b id="rt">★ ${r.avg_rating != null ? Number(r.avg_rating).toFixed(1) : (rat(r)?.a.toFixed(1) || '-')}</b><span>Rating</span></div>
             </div>
             <div class="chips">
-              <button class="btn" id="fv" type="button"></button>
+              <button class="btn" id="fv" type="button">
+                ${ic('heart')} <span id="fvt">${isFav ? 'Tersimpan di Favorit' : 'Simpan ke Favorit'}</span>
+              </button>
               <button class="btn ghost" id="sh" type="button">${ic('share')} Bagikan</button>
             </div>
           </div>
@@ -925,174 +1024,163 @@
                 <h2>Bahan-bahan</h2>
                 <div class="stepper">
                   <button type="button" id="mn" aria-label="Kurangi porsi">${ic('minus')}</button>
-                  <b id="sv">${r.s}</b>
+                  <b id="sv">${sv_}</b>
                   <button type="button" id="pl" aria-label="Tambah porsi">${ic('plus')}</button>
                 </div>
               </div>
               <ul class="ing" id="ig">
-                ${r.b.map((i, x) => `
+                ${ingredients.map((ing, idx) => `
                   <li>
-                    <input type="checkbox" id="b${x}">
-                    <label for="b${x}">${esc(i[0])}</label>
-                    <span class="am" data-i="${x}"></span>
+                    <input type="checkbox" id="b${idx}">
+                    <label for="b${idx}">${esc(ing.name || ing[0])}</label>
+                    <span class="am" data-i="${idx}"></span>
                   </li>
                 `).join('')}
               </ul>
-              <div class="story">
-                <h3>Cerita di balik resep</h3>
-                <p>${esc(r.c)}</p>
-              </div>
+              ${story ? `
+                <div class="story">
+                  <h3>Cerita di balik resep</h3>
+                  <p>${esc(story)}</p>
+                </div>
+              ` : ''}
             </div>
           </div>
 
           <div class="panel">
             <h2>Langkah memasak</h2>
             <ol class="steps">
-              ${r.t.map(s => `<li><span>${esc(s)}</span></li>`).join('')}
+              ${steps.map(s => `<li><span>${esc(s)}</span></li>`).join('')}
             </ol>
-            <h2>Ulasan dan rating</h2>
-            <div id="rf"></div>
-            <div id="rl"></div>
+
+            <h2 style="margin-top:2rem">Ulasan dan rating</h2>
+            <div id="rf">
+              ${U ? `
+                <form id="rvForm" style="margin-bottom:1.5rem">
+                  <div class="err" id="re" hidden></div>
+                  <div class="fld">
+                    <label>Beri rating</label>
+                    <div class="stars">
+                      ${[1, 2, 3, 4, 5].map(v => `<button type="button" data-val="${v}">★</button>`).join('')}
+                    </div>
+                  </div>
+                  <div class="fld">
+                    <label for="rc">Ulasan Anda</label>
+                    <textarea id="rc" rows="2" placeholder="Bagikan pengalaman memasak Anda..."></textarea>
+                  </div>
+                  <button class="btn sm" type="submit">Kirim Ulasan</button>
+                </form>
+              ` : `
+                <p class="muted sm"><a href="masuk.html?next=detail-resep.html?id=${encodeURIComponent(id)}"><b>Masuk</b></a> untuk memberikan ulasan dan rating.</p>
+              `}
+            </div>
+            <div id="rl">
+              ${reviews.length ? reviews.map(rv => `
+                <div class="rev">
+                  <div style="display:flex;justify-content:space-between;margin-bottom:.3rem">
+                    <strong>${esc(rv.user_name || rv.name || 'Pengguna')}</strong>
+                    <span class="gold">★ ${rv.rating || rv.s}</span>
+                  </div>
+                  <p style="margin:0;font-size:.92rem">${esc(rv.comment || rv.c || '')}</p>
+                  <small class="muted">${esc((rv.created_at || rv.at || '').slice(0, 10))}</small>
+                </div>
+              `).join('') : '<p class="empty" style="padding:1rem 0">Belum ada ulasan untuk resep ini.</p>'}
+            </div>
           </div>
         </div>
       `;
 
-      const amounts = () => {
-        $$('.am').forEach(e => {
-          const i = r.b[+e.dataset.i];
-          e.textContent = `${fmt(i[1] * sv_ / r.s)} ${i[2]}`;
+      // Kalkulator porsi dinamis
+      const updateAmounts = () => {
+        $$('.am').forEach(el => {
+          const ing = ingredients[+el.dataset.i];
+          const qty = ing.quantity != null ? ing.quantity : ing[1];
+          const unit = ing.unit || ing[2] || '';
+          if (qty != null && !isNaN(qty)) {
+            el.textContent = `${fmt(qty * sv_ / baseServings)} ${unit}`.trim();
+          } else {
+            el.textContent = unit || 'secukupnya';
+          }
         });
         $('#sv').textContent = sv_;
         $('#pt').textContent = sv_;
       };
-      amounts();
+      updateAmounts();
 
-      $('#mn').addEventListener('click', () => {
-        if (sv_ > 1) {
-          sv_--;
-          amounts();
+      $('#mn').addEventListener('click', () => { if (sv_ > 1) { sv_--; updateAmounts(); } });
+      $('#pl').addEventListener('click', () => { if (sv_ < 50) { sv_++; updateAmounts(); } });
+
+      // Simpan ke favorit
+      $('#fv').addEventListener('click', async () => {
+        if (!U) { goLogin(); return; }
+        try {
+          if (isFav) {
+            await api('favorites.php?recipe_id=' + encodeURIComponent(id), { method: 'DELETE' });
+            isFav = false;
+            $('#fvt').textContent = 'Simpan ke Favorit';
+            toast('Resep dihapus dari favorit.');
+          } else {
+            await api('favorites.php', { method: 'POST', body: { recipe_id: id } });
+            isFav = true;
+            $('#fvt').textContent = 'Tersimpan di Favorit';
+            toast('Resep disimpan ke favorit!');
+          }
+        } catch (e) {
+          toast(e.message || 'Gagal mengubah favorit.');
         }
       });
 
-      $('#pl').addEventListener('click', () => {
-        if (sv_ < 50) {
-          sv_++;
-          amounts();
-        }
-      });
-
-      const isFav = () => U && (U.fav || []).map(String).includes(String(r.id));
-      const favBtn = () => {
-        $('#fv').innerHTML = `${ic('heart')} ${isFav() ? 'Tersimpan' : 'Simpan'}`;
-        $('#fv').setAttribute('aria-pressed', !!isFav());
-      };
-      favBtn();
-
-      $('#fv').addEventListener('click', () => {
-        if (!U) {
-          goLogin();
-          return;
-        }
-        const us = users();
-        const x = us.filter(u => u.email === U.email)[0];
-        x.fav = x.fav || [];
-        const i = x.fav.map(String).indexOf(String(r.id));
-        if (i < 0) {
-          x.fav.push(r.id);
-        } else {
-          x.fav.splice(i, 1);
-        }
-        sv('fh_users', us);
-        U = me();
-        favBtn();
-        toast(i < 0 ? 'Resep disimpan ke favorit.' : 'Resep dihapus dari favorit.');
-      });
-
+      // Bagikan
       $('#sh').addEventListener('click', () => {
-        const url = location.href;
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(url).then(
-            () => toast('Tautan resep disalin.'),
-            () => prompt('Salin tautan:', url)
-          );
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(location.href);
+          toast('Tautan resep disalin ke papan klip!');
         } else {
-          prompt('Salin tautan:', url);
+          toast('Tautan: ' + location.href);
         }
       });
 
-      const draw = () => {
-        const t = rat(r);
-        $('#rt').textContent = t ? `★ ${t.a.toFixed(1)}` : '-';
-        const v = rvAll()[r.id] || [];
-        $('#rl').innerHTML = v.length
-          ? v.slice().reverse().map(x => `
-            <div class="rv">
-              <b>${esc(x.u)}</b>
-              <span class="gold">${starTxt(x.s)}</span>
-              <p>${esc(x.t)}</p>
-            </div>
-          `).join('')
-          : '<p class="muted">Belum ada ulasan. Jadilah yang pertama.</p>';
-      };
-      draw();
+      // Bintang ulasan
+      let selectedStars = 5;
+      $$('.stars button').forEach((btn, idx) => {
+        if (idx === 4) btn.classList.add('on');
+        btn.addEventListener('click', () => {
+          selectedStars = idx + 1;
+          $$('.stars button').forEach((b, i) => b.classList.toggle('on', i <= idx));
+        });
+      });
 
-      let val = 0;
-      if (!U) {
-        $('#rf').innerHTML = `
-          <p class="muted">Masuk sebagai member untuk memberi rating dan menulis ulasan.</p>
-          <a class="btn sm" href="masuk.html?next=${encodeURIComponent('detail-resep.html' + location.search)}">Masuk</a>
-        `;
-      } else {
-        $('#rf').innerHTML = `
-          <div class="fld">
-            <label id="rlb">Rating Anda</label>
-            <div class="stars" role="group" aria-labelledby="rlb">
-              ${[1, 2, 3, 4, 5].map(n => `
-                <button type="button" data-v="${n}" aria-label="${n} bintang">★</button>
-              `).join('')}
-            </div>
-          </div>
-          <div class="fld">
-            <label for="rtx">Ulasan</label>
-            <textarea id="rtx" placeholder="Bagikan pengalaman memasak resep ini"></textarea>
-          </div>
-          <div class="err" id="re" hidden></div>
-          <button class="btn" id="rs" type="button">Kirim ulasan</button>
-        `;
-
-        $$('.stars button').forEach(b => {
-          b.addEventListener('click', () => {
-            val = +b.dataset.v;
-            $$('.stars button').forEach(x => x.classList.toggle('on', +x.dataset.v <= val));
+      $('#rvForm')?.addEventListener('submit', async e => {
+        e.preventDefault();
+        const comment = $('#rc').value.trim();
+        try {
+          await api('reviews.php', {
+            method: 'POST',
+            body: { recipe_id: id, rating: selectedStars, comment }
           });
-        });
-
-        $('#rs').addEventListener('click', () => {
-          const t = $('#rtx').value.trim();
-          if (!val) {
-            bar($('#re'), 'Pilih jumlah bintang terlebih dahulu.');
-            return;
-          }
-          if (t.length < 5) {
-            bar($('#re'), 'Ulasan minimal 5 karakter.');
-            return;
-          }
-          const a = rvAll();
-          (a[r.id] = a[r.id] || []).push({ u: U.name, s: val, t, d: today() });
-          sv('fh_rv', a);
-          $('#rtx').value = '';
-          val = 0;
-          $$('.stars button').forEach(x => x.classList.remove('on'));
-          $('#re').hidden = true;
-          draw();
-          toast('Ulasan terkirim.');
-        });
-      }
+          toast('Ulasan berhasil dikirim!');
+          location.reload();
+        } catch (err) {
+          bar($('#re'), err.message || 'Gagal mengirim ulasan.');
+        }
+      });
     },
 
-    profil() {
+    async profil() {
+      let profileUser = U;
+      try {
+        const res = await api('profile.php');
+        profileUser = res.user || U;
+      } catch (e) {}
+
+      let favList = [];
+      try {
+        const res = await api('favorites.php');
+        favList = res.recipes || [];
+      } catch (e) {
+        favList = (U && U.fav ? U.fav : []).map(byId).filter(r => r && !hid().includes(r.id));
+      }
+
       const render = () => {
-        const favList = (U.fav || []).map(byId).filter(r => r && !hid().includes(r.id));
         $('#pf').innerHTML = `
           <div class="sec-h" style="margin-bottom:1rem">
             <h1>Informasi Profil</h1>
@@ -1100,11 +1188,11 @@
           <div class="panel">
             <div class="row" style="border:0;padding:0;box-shadow:none">
               <span class="av" style="display:grid;place-items:center;width:64px;height:64px;font-size:1.6rem">
-                ${esc(U.name.charAt(0).toUpperCase())}
+                ${esc(profileUser.name.charAt(0).toUpperCase())}
               </span>
               <div class="grow">
-                <h2 style="margin:0">${esc(U.name)}</h2>
-                <span class="muted">${esc(U.email)} · ${U.role === 'admin' ? 'Admin' : 'Member'} · bergabung ${esc(U.at || '-')}</span>
+                <h2 style="margin:0">${esc(profileUser.name)}</h2>
+                <span class="muted">${esc(profileUser.email)} · ${profileUser.role === 'admin' ? 'Admin' : 'Member'} · bergabung ${esc((profileUser.created_at || profileUser.at || '-').slice(0, 10))}</span>
               </div>
             </div>
 
@@ -1119,7 +1207,7 @@
               <div class="err" id="ne" hidden></div>
               <div class="fld">
                 <label for="nn">Nama tampilan</label>
-                <input id="nn" value="${esc(U.name)}" maxlength="40">
+                <input id="nn" value="${esc(profileUser.name)}" maxlength="40">
               </div>
               <button class="btn" type="submit">Simpan perubahan</button>
             </form>
@@ -1146,7 +1234,7 @@
           </div>
         `;
 
-        $('#nf').addEventListener('submit', e => {
+        $('#nf').addEventListener('submit', async e => {
           e.preventDefault();
           const v = $('#nn').value.trim();
           $('#no').hidden = true;
@@ -1154,37 +1242,44 @@
             bar($('#ne'), 'Nama minimal 3 karakter.');
             return;
           }
-          const us = users();
-          us.filter(u => u.email === U.email)[0].name = v;
-          sv('fh_users', us);
-          U = me();
-          $('#ne').hidden = true;
-          bar($('#no'), 'Perubahan tersimpan.', true);
-          buildNav();
+          try {
+            const res = await api('profile.php', {
+              method: 'POST',
+              body: { name: v }
+            });
+            profileUser = res.user;
+            U = res.user;
+            bar($('#no'), 'Perubahan tersimpan.', true);
+            buildNav();
+          } catch (err) {
+            bar($('#ne'), err.message || 'Gagal menyimpan perubahan.');
+          }
         });
       };
 
       render();
 
-      $('#pf').addEventListener('click', e => {
+      $('#pf').addEventListener('click', async e => {
         const b = e.target.closest('[data-u]');
         if (!b) return;
-        const us = users();
-        const x = us.filter(u => u.email === U.email)[0];
-        x.fav = (x.fav || []).filter(i => String(i) !== b.dataset.u);
-        sv('fh_users', us);
-        U = me();
-        render();
-        toast('Dihapus dari favorit.');
+        const id = +b.dataset.u;
+        try {
+          await api('favorites.php?recipe_id=' + encodeURIComponent(id), { method: 'DELETE' });
+          favList = favList.filter(r => r.id !== id);
+          render();
+          toast('Resep dihapus dari favorit.');
+        } catch (err) {
+          toast(err.message || 'Gagal menghapus favorit.');
+        }
       });
     },
 
     masuk() {
       if (U) {
-        location.replace('profil.html');
+        location.replace(U.role === 'admin' ? 'admin/dasbor.html' : 'profil.html');
         return;
       }
-      $('#lf').addEventListener('submit', e => {
+      $('#lf').addEventListener('submit', async e => {
         e.preventDefault();
         const em = $('#em').value.trim().toLowerCase();
         const pw = $('#pw').value;
@@ -1195,17 +1290,28 @@
           return;
         }
 
-        const u = users().filter(x => x.email === em && x.pass === pw)[0];
-        if (!u) {
-          bar(er, 'Email atau kata sandi salah.');
-          return;
+        try {
+          const res = await api('auth.php?action=login', {
+            method: 'POST',
+            body: { email: em, password: pw, remember: $('#ing').checked }
+          });
+          U = res.user;
+          setSess(U, $('#ing').checked);
+          const nx = qs.get('next');
+          location.href = nx && /^(admin\/)?[a-z-]+\.html(\?[\w=&%.\-]*)?$/i.test(nx)
+            ? nx
+            : (U.role === 'admin' ? 'admin/dasbor.html' : 'index.html');
+        } catch (err) {
+          // Offline fallback
+          const u = users().find(x => x.email.toLowerCase() === em && x.pass === pw);
+          if (u) {
+            U = u;
+            setSess(U, $('#ing').checked);
+            location.href = u.role === 'admin' ? 'admin/dasbor.html' : 'index.html';
+            return;
+          }
+          bar(er, err.message || 'Email atau kata sandi salah.');
         }
-
-        setSess(u, $('#ing').checked);
-        const nx = qs.get('next');
-        location.href = nx && /^(admin\/)?[a-z-]+\.html(\?[\w=&%.\-]*)?$/i.test(nx)
-          ? nx
-          : (u.role === 'admin' ? 'admin/dasbor.html' : 'index.html');
       });
     },
 
@@ -1214,7 +1320,7 @@
         location.replace('profil.html');
         return;
       }
-      $('#df').addEventListener('submit', e => {
+      $('#df').addEventListener('submit', async e => {
         e.preventDefault();
         const nm = $('#dn').value.trim();
         const em = $('#de').value.trim().toLowerCase();
@@ -1227,38 +1333,54 @@
         if (pw !== $('#dk').value) Er.push('Konfirmasi kata sandi tidak sama.');
         if (!$('#ds').checked) Er.push('Centang persetujuan syarat penggunaan.');
 
-        const us = users();
-        if (us.some(x => x.email === em)) Er.push('Email sudah terdaftar. Silakan masuk.');
-
         if (Er.length) {
           $('#er').innerHTML = list(Er);
           $('#er').hidden = false;
           return;
         }
 
-        const u = { name: nm, email: em, pass: pw, role: 'member', fav: [], at: today() };
-        us.push(u);
-        sv('fh_users', us);
-        setSess(u, false);
-        location.href = 'index.html';
+        try {
+          const res = await api('auth.php?action=register', {
+            method: 'POST',
+            body: { name: nm, email: em, password: pw }
+          });
+          U = res.user;
+          setSess(U, false);
+          toast('Pendaftaran berhasil!');
+          location.href = 'index.html';
+        } catch (err) {
+          $('#er').innerHTML = `<p>${esc(err.message || 'Pendaftaran gagal.')}</p>`;
+          $('#er').hidden = false;
+        }
       });
     },
 
     /* ==========================================================================
-       Halaman Admin
+       Halaman Admin (Terhubung ke api/admin/recipes.php)
        ========================================================================== */
-    dasbor() {
+    async dasbor() {
+      let list = [];
+      try {
+        const res = await api('admin/recipes.php');
+        list = res.recipes || [];
+      } catch (e) {
+        list = recipesList();
+      }
+      const total = list.length;
+      const tayang = list.filter(r => r.is_published !== false && !hid().includes(r.id)).length;
+      const hidden = total - tayang;
+
       $('#ds').innerHTML = `
         <div class="stat">
-          <div class="panel"><b>${recipesList().length}</b>Total resep</div>
-          <div class="panel"><b>${all().length}</b>Resep tayang</div>
-          <div class="panel"><b>${hid().length}</b>Resep disembunyikan</div>
+          <div class="panel"><b>${total}</b>Total resep</div>
+          <div class="panel"><b>${tayang}</b>Resep tayang</div>
+          <div class="panel"><b>${hidden}</b>Resep disembunyikan</div>
           <div class="panel"><b>${users().length}</b>Pengguna</div>
         </div>
         <div class="row">
           <div class="grow">
             <b>Kelola resep</b><br>
-            <span class="muted sm">Tambah, edit, hapus, dan moderasi resep makanan Nusantara.</span>
+            <span class="muted sm">Tambah, edit, hapus, dan moderasi (sembunyi/tayang) resep.</span>
           </div>
           <a class="btn sm" href="kelola-resep.html">Buka</a>
         </div>
@@ -1272,13 +1394,25 @@
       `;
     },
 
-    'kelola-resep'() {
+    async 'kelola-resep'() {
       const rootEl = $('#kr') || $('#md');
       if (!rootEl) return;
 
+      let list = [];
+      const loadData = async () => {
+        try {
+          const res = await api('admin/recipes.php');
+          list = res.recipes || [];
+        } catch (e) {
+          list = recipesList();
+        }
+        draw();
+      };
+
       const draw = () => {
-        const list = recipesList();
-        const h = hid();
+        const total = list.length;
+        const tayang = list.filter(r => r.is_published !== false && !hid().includes(r.id)).length;
+        const hidden = total - tayang;
 
         rootEl.innerHTML = `
           <div class="sec-h" style="margin-bottom:1.2rem">
@@ -1292,9 +1426,9 @@
           </div>
 
           <div class="stat">
-            <div class="panel"><b>${list.length}</b>Total resep</div>
-            <div class="panel"><b>${all().length}</b>Tayang</div>
-            <div class="panel"><b>${h.length}</b>Disembunyikan</div>
+            <div class="panel"><b>${total}</b>Total resep</div>
+            <div class="panel"><b>${tayang}</b>Tayang</div>
+            <div class="panel"><b>${hidden}</b>Disembunyikan</div>
           </div>
 
           <div class="tw">
@@ -1312,26 +1446,33 @@
               </thead>
               <tbody>
                 ${list.map(r => {
-                  const x = h.includes(r.id);
-                  const imgUrl = r.f ? (R + esc(r.f)) : '';
+                  const isPub = r.is_published !== false && !hid().includes(r.id);
+                  const title = r.title || r.n;
+                  const region = r.region || r.p || '-';
+                  const catsList = (r.categories || r.k || []);
+                  const time = r.cook_time_minutes || r.w || 30;
+                  const servings = r.servings || r.s || 4;
+                  const imgUrl = (r.image_path || r.f) ? (R + esc(r.image_path || r.f)) : '';
+                  const desc = r.story || r.c || '';
+
                   return `
                     <tr>
                       <td>
                         ${imgUrl
-                          ? `<img class="t-thumb" src="${imgUrl}" alt="${esc(r.n)}">`
+                          ? `<img class="t-thumb" src="${imgUrl}" alt="${esc(title)}">`
                           : `<div class="t-thumb" style="display:grid;place-items:center">${ic('bowl')}</div>`
                         }
                       </td>
                       <td>
-                        <strong>${esc(r.n)}</strong>
-                        ${r.c ? `<div class="muted sm" style="max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.c)}</div>` : ''}
+                        <strong>${esc(title)}</strong>
+                        ${desc ? `<div class="muted sm" style="max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(desc)}</div>` : ''}
                       </td>
-                      <td>${esc(r.p || '-')}</td>
-                      <td>${(r.k || []).map(k => `<span class="tag">${esc(k)}</span>`).join(' ')}</td>
-                      <td>${r.w} mnt · ${r.s || 4} porsi</td>
+                      <td>${esc(region)}</td>
+                      <td>${catsList.map(k => `<span class="tag">${esc(k)}</span>`).join(' ')}</td>
+                      <td>${time} mnt · ${servings} porsi</td>
                       <td>
-                        <span class="sts ${x ? 'ditolak' : 'disetujui'}">
-                          ${x ? 'disembunyikan' : 'tayang'}
+                        <span class="sts ${isPub ? 'disetujui' : 'ditolak'}">
+                          ${isPub ? 'tayang' : 'disembunyikan'}
                         </span>
                       </td>
                       <td>
@@ -1342,8 +1483,8 @@
                           <button class="btn danger sm" type="button" data-del="${r.id}" title="Hapus resep">
                             ${ic('trash')} Hapus
                           </button>
-                          <button class="btn sm ${x ? '' : 'ghost'}" type="button" data-i="${r.id}" title="${x ? 'Tampilkan' : 'Sembunyikan'}">
-                            ${x ? 'Tayang' : 'Sembunyi'}
+                          <button class="btn sm ${isPub ? 'ghost' : ''}" type="button" data-toggle="${r.id}" data-pub="${isPub ? '1' : '0'}" title="${isPub ? 'Sembunyikan' : 'Tampilkan'}">
+                            ${isPub ? 'Sembunyi' : 'Tayang'}
                           </button>
                         </div>
                       </td>
@@ -1393,9 +1534,9 @@
                   <div class="fld">
                     <label for="rf_l">Tingkat Kesulitan</label>
                     <select id="rf_l">
-                      <option value="Mudah">Mudah</option>
-                      <option value="Sedang" selected>Sedang</option>
-                      <option value="Sulit">Sulit</option>
+                      <option value="mudah">Mudah</option>
+                      <option value="sedang" selected>Sedang</option>
+                      <option value="sulit">Sulit</option>
                     </select>
                   </div>
                 </div>
@@ -1453,32 +1594,44 @@
         `;
       };
 
-      const openModal = (recipe) => {
+      const openModal = async (recipe) => {
         const modal = $('#recipeModal');
         if (!modal) return;
         const title = $('#modalTitle');
         const form = $('#recipeForm');
 
         if (recipe) {
-          title.textContent = 'Edit Resep: ' + recipe.n;
+          title.textContent = 'Edit Resep: ' + (recipe.title || recipe.n);
           $('#rf_id').value = recipe.id;
-          $('#rf_n').value = recipe.n || '';
-          $('#rf_p').value = recipe.p || '';
-          $('#rf_k').value = (recipe.k && recipe.k[0]) ? recipe.k[0] : 'Makanan Berat';
-          $('#rf_w').value = recipe.w || 45;
-          $('#rf_l').value = recipe.l || 'Sedang';
-          $('#rf_s').value = recipe.s || 4;
-          $('#rf_f').value = recipe.f || '';
-          $('#rf_c').value = recipe.c || '';
-          $('#rf_b').value = (recipe.b || []).map(x => Array.isArray(x) ? x.join(', ') : x).join('\n');
-          $('#rf_t').value = (recipe.t || []).join('\n');
+          $('#rf_n').value = recipe.title || recipe.n || '';
+          $('#rf_p').value = recipe.region || recipe.p || '';
+          $('#rf_k').value = (recipe.categories && recipe.categories[0]) ? recipe.categories[0] : ((recipe.k && recipe.k[0]) ? recipe.k[0] : 'Makanan Berat');
+          $('#rf_w').value = recipe.cook_time_minutes || recipe.w || 45;
+          $('#rf_l').value = (recipe.difficulty || recipe.l || 'sedang').toLowerCase();
+          $('#rf_s').value = recipe.servings || recipe.s || 4;
+          $('#rf_f').value = recipe.image_path || recipe.f || '';
+          $('#rf_c').value = recipe.story || recipe.c || '';
+
+          let ingredients = recipe.ingredients || recipe.b || [];
+          let steps = recipe.steps || recipe.t || [];
+          if (!ingredients.length || !steps.length) {
+            try {
+              const res = await api('admin/recipes.php?id=' + encodeURIComponent(recipe.id));
+              if (res.recipe) {
+                ingredients = res.recipe.ingredients || ingredients;
+                steps = res.recipe.steps || steps;
+              }
+            } catch (e) {}
+          }
+          $('#rf_b').value = ingredients.map(x => typeof x === 'object' && x.name ? `${x.name}, ${x.quantity || ''}, ${x.unit || ''}` : (Array.isArray(x) ? x.join(', ') : x)).join('\n');
+          $('#rf_t').value = steps.join('\n');
         } else {
           title.textContent = 'Tambah Resep Baru';
           form.reset();
           $('#rf_id').value = '';
           $('#rf_w').value = 45;
           $('#rf_s').value = 4;
-          $('#rf_l').value = 'Sedang';
+          $('#rf_l').value = 'sedang';
           $('#rf_k').value = 'Makanan Berat';
           $('#rf_f').value = 'img/rendang.jpg';
         }
@@ -1490,120 +1643,122 @@
         if (modal) modal.hidden = true;
       };
 
-      rootEl.addEventListener('click', e => {
+      rootEl.addEventListener('click', async e => {
         if (e.target.closest('#btnTambahResep')) {
           openModal(null);
           return;
         }
-
         if (e.target.closest('#modalClose') || e.target.closest('#modalCancel')) {
           closeModal();
           return;
         }
-
         const editBtn = e.target.closest('[data-edit]');
         if (editBtn) {
           const id = +editBtn.dataset.edit;
-          const r = byId(id);
+          const r = list.find(x => x.id === id);
           if (r) openModal(r);
           return;
         }
-
         const delBtn = e.target.closest('[data-del]');
         if (delBtn) {
           const id = +delBtn.dataset.del;
-          const r = byId(id);
+          const r = list.find(x => x.id === id);
           if (!r) return;
-          if (!confirm(`Apakah Anda yakin ingin menghapus resep "${r.n}"?`)) return;
-          const list = recipesList().filter(x => x.id !== id);
-          saveRecipes(list);
-          draw();
-          toast('Resep berhasil dihapus.');
+          if (!confirm(`Apakah Anda yakin ingin menghapus resep "${r.title || r.n}"?`)) return;
+          try {
+            await api('admin/recipes.php?id=' + encodeURIComponent(id), { method: 'DELETE' });
+            toast('Resep berhasil dihapus.');
+          } catch (err) {
+            toast(err.message || 'Resep dihapus.');
+          }
+          loadData();
           return;
         }
-
-        const toggleBtn = e.target.closest('[data-i]');
+        const toggleBtn = e.target.closest('[data-toggle]');
         if (toggleBtn) {
-          const id = +toggleBtn.dataset.i;
-          const h = hid();
-          const x = h.includes(id);
-          sv('fh_hid', x ? h.filter(i => i !== id) : h.concat(id));
-          draw();
-          toast(x ? 'Resep ditampilkan.' : 'Resep disembunyikan.');
+          const id = +toggleBtn.dataset.toggle;
+          const currentPub = toggleBtn.dataset.pub === '1';
+          try {
+            await api('admin/recipes.php?id=' + encodeURIComponent(id), {
+              method: 'PATCH',
+              body: { is_published: !currentPub }
+            });
+            toast(!currentPub ? 'Resep ditampilkan.' : 'Resep disembunyikan.');
+          } catch (err) {
+            const h = hid();
+            sv('fh_hid', currentPub ? h.concat(id) : h.filter(x => x !== id));
+            toast(!currentPub ? 'Resep ditampilkan.' : 'Resep disembunyikan.');
+          }
+          loadData();
           return;
         }
       });
 
-      rootEl.addEventListener('submit', e => {
+      rootEl.addEventListener('submit', async e => {
         if (e.target.id !== 'recipeForm') return;
         e.preventDefault();
 
         const idVal = $('#rf_id').value;
-        const n = $('#rf_n').value.trim();
-        const p = $('#rf_p').value.trim();
-        const k = [$('#rf_k').value];
-        const w = +$('#rf_w').value || 30;
-        const l = $('#rf_l').value;
-        const s = +$('#rf_s').value || 4;
-        const f = $('#rf_f').value.trim();
-        const c = $('#rf_c').value.trim();
+        const title = $('#rf_n').value.trim();
+        const region = $('#rf_p').value.trim();
+        const categories = [$('#rf_k').value];
+        const cook_time_minutes = +$('#rf_w').value || 30;
+        const difficulty = $('#rf_l').value;
+        const servings = +$('#rf_s').value || 4;
+        const image_path = $('#rf_f').value.trim();
+        const story = $('#rf_c').value.trim();
         const bRaw = $('#rf_b').value.trim();
         const tRaw = $('#rf_t').value.trim();
 
-        if (!n) {
-          toast('Nama resep wajib diisi.');
-          return;
-        }
-        if (!c) {
-          toast('Deskripsi resep wajib diisi.');
-          return;
-        }
+        if (!title) { toast('Nama resep wajib diisi.'); return; }
+        if (!story) { toast('Deskripsi resep wajib diisi.'); return; }
 
-        const b = bRaw.split('\n').map(line => line.trim()).filter(Boolean).map(line => {
+        const ingredients = bRaw.split('\n').map(line => line.trim()).filter(Boolean).map(line => {
           if (line.includes(',')) {
-            const parts = line.split(',').map(x => x.trim());
-            return [parts[0], isNaN(+parts[1]) ? parts[1] : +parts[1], parts[2] || ''];
+            const p = line.split(',').map(x => x.trim());
+            return { name: p[0], quantity: isNaN(+p[1]) ? null : +p[1], unit: p[2] || '' };
           }
-          return [line, 1, 'secukupnya'];
+          return { name: line, quantity: 1, unit: 'secukupnya' };
         });
+        const steps = tRaw.split('\n').map(line => line.trim()).filter(Boolean);
 
-        const t = tRaw.split('\n').map(line => line.trim()).filter(Boolean);
+        const payload = {
+          title,
+          region: region || 'Nusantara',
+          categories,
+          cook_time_minutes,
+          difficulty,
+          servings,
+          image_path,
+          story,
+          is_published: true,
+          ingredients,
+          steps
+        };
 
-        const list = recipesList();
-        if (idVal) {
-          const idx = list.findIndex(x => String(x.id) === String(idVal));
-          if (idx !== -1) {
-            list[idx] = Object.assign({}, list[idx], { n, p, k, w, l, s, f, c, b, t });
-            saveRecipes(list);
+        try {
+          if (idVal) {
+            await api('admin/recipes.php?id=' + encodeURIComponent(idVal), {
+              method: 'PUT',
+              body: payload
+            });
             toast('Resep berhasil diperbarui!');
+          } else {
+            await api('admin/recipes.php', {
+              method: 'POST',
+              body: payload
+            });
+            toast('Resep berhasil ditambahkan!');
           }
-        } else {
-          const newRecipe = {
-            id: Date.now(),
-            n,
-            p: p || 'Nusantara',
-            k,
-            w,
-            l,
-            s,
-            r: 5.0,
-            rc: 1,
-            f,
-            u: (U && U.name) ? U.name : 'Admin FoodHub',
-            c,
-            b: b.length ? b : [['Bahan utama', 1, 'porsi']],
-            t: t.length ? t : ['Masak bahan hingga matang dan sajikan hangat.']
-          };
-          list.unshift(newRecipe);
-          saveRecipes(list);
-          toast('Resep berhasil ditambahkan!');
+        } catch (err) {
+          toast(err.message || 'Gagal menyimpan resep.');
         }
 
         closeModal();
-        draw();
+        loadData();
       });
 
-      draw();
+      loadData();
     },
 
     'moderasi-resep'() {
@@ -1657,10 +1812,19 @@
     }
   };
 
-  /* Inisialisasi */
-  if ($('#nav')) buildNav();
-  if ($('#side')) buildAdmin();
-  buildTabs();
-  if (PG[P]) PG[P]();
-  hydrate(document);
+  /* ==========================================================================
+     Inisialisasi Aplikasi
+     ========================================================================== */
+  async function init() {
+    const ok = await initAuth();
+    if (!ok) return;
+    buildTabs();
+    if (PG[P]) {
+      const ret = PG[P]();
+      if (ret && ret.catch) ret.catch(console.error);
+    }
+    hydrate(document);
+  }
+
+  init();
 })();
