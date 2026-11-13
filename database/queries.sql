@@ -16,9 +16,9 @@ SELECT id, name, email, password_hash, role FROM users WHERE email = 'raka@conto
 -- --------------------------------------------------------------------------
 SELECT id, name, slug FROM categories ORDER BY id;                -- chip kategori
 
-SELECT * FROM v_recipe_cards WHERE is_published = 1                 -- resep populer
+SELECT * FROM v_recipe_cards WHERE is_published = 1                 -- resep populer (3 kartu sebaris)
 ORDER BY favorite_count DESC, avg_rating DESC
-LIMIT 4;
+LIMIT 3;
 
 -- --------------------------------------------------------------------------
 -- DAFTAR RESEP - cari nama/bahan + filter kategori, waktu, kesulitan
