@@ -1,42 +1,63 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Beranda | FoodHub</title>
-<link rel="icon" href="img/logo-foodhub.jpg">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;0,800;1,600&family=Outfit:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Beranda | FoodHub</title>
+  <link rel="icon" href="img/logo-foodhub.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;0,800;1,600&family=Outfit:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body data-page="index" data-root="" data-access="">
-<header id="nav"></header>
-<main>
-<section class="container hero">
-<div>
-<span class="pill">Platform resep makanan digital</span>
-<h1>Masak apa hari ini? <em>Temukan di FoodHub.</em></h1>
-<p class="lead">Cari resep dengan takaran jelas, atur jumlah porsi sesuai kebutuhan, dan simpan resep favoritmu.</p>
-<form id="heroForm" class="searchbar" role="search"><input id="q" type="search" placeholder="Cari resep, bahan, atau masakan" aria-label="Cari resep"><button class="btn" type="submit"><i data-ic="search"></i> Cari</button></form>
-<div class="chips" id="cats"></div>
-</div>
-<div class="art" aria-hidden="true">
-<div class="stk s1"><i data-ic="clock"></i> Takaran jelas</div>
-<div class="stk s2"><i data-ic="chef"></i> Atur porsi</div>
-<div class="stk s3"><i data-ic="heart"></i> Simpan favorit</div>
-</div>
-</section>
-<section class="container">
-<div class="sec-h"><h2>Resep populer minggu ini</h2><a href="daftar-resep.html">Lihat semua</a></div>
-<div class="grid" id="pop"></div>
-</section>
-<section class="container two">
-<a class="sc red" href="daftar-resep.html"><i data-ic="book"></i><h3>Jelajahi semua resep</h3><p>Filter berdasarkan kategori, waktu memasak, dan tingkat kesulitan.</p><span class="btn dark sm">Lihat Daftar Resep</span></a>
-<a class="sc gold" href="faq.html"><i data-ic="chat"></i><h3>Punya pertanyaan?</h3><p>Temukan jawaban seputar penggunaan FoodHub.</p><span class="btn dark sm">Buka FAQ</span></a>
-</section>
-</main>
-<footer id="foot"></footer>
-<script src="js/main.js"></script>
+  <header id="nav"></header>
+
+  <main>
+    <section class="container hero">
+      <div>
+        <span class="pill">Platform resep makanan digital</span>
+        <h1>Masak apa hari ini? <em>Temukan di FoodHub.</em></h1>
+        <p class="lead">Cari resep dengan takaran jelas, atur jumlah porsi sesuai kebutuhan, dan simpan resep favoritmu.</p>
+        <form id="heroForm" class="searchbar" role="search">
+          <input id="q" type="search" placeholder="Cari resep, bahan, atau masakan" aria-label="Cari resep">
+          <button class="btn" type="submit"><i data-ic="search"></i> Cari</button>
+        </form>
+        <div class="chips" id="cats"></div>
+      </div>
+      <div class="art" aria-hidden="true">
+        <div class="stk s1"><i data-ic="clock"></i> Takaran jelas</div>
+        <div class="stk s2"><i data-ic="chef"></i> Atur porsi</div>
+        <div class="stk s3"><i data-ic="heart"></i> Simpan favorit</div>
+      </div>
+    </section>
+
+    <section class="container">
+      <div class="sec-h">
+        <h2>Resep populer minggu ini</h2>
+        <a href="daftar-resep.html">Lihat semua</a>
+      </div>
+      <div class="grid" id="pop"></div>
+    </section>
+
+    <section class="container two">
+      <a class="sc red" href="daftar-resep.html">
+        <i data-ic="book"></i>
+        <h3>Jelajahi semua resep</h3>
+        <p>Filter berdasarkan kategori, waktu memasak, dan tingkat kesulitan.</p>
+        <span class="btn dark sm">Lihat Daftar Resep</span>
+      </a>
+      <a class="sc gold" href="faq.html">
+        <i data-ic="chat"></i>
+        <h3>Punya pertanyaan?</h3>
+        <p>Temukan jawaban seputar penggunaan FoodHub.</p>
+        <span class="btn dark sm">Buka FAQ</span>
+      </a>
+    </section>
+  </main>
+
+  <footer id="foot"></footer>
+
+  <script src="js/main.js"></script>
 </body>
 </html>

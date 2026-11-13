@@ -1,32 +1,63 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Daftar Resep | FoodHub</title>
-<link rel="icon" href="img/logo-foodhub.jpg">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;0,800;1,600&family=Outfit:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Daftar Resep | FoodHub</title>
+  <link rel="icon" href="img/logo-foodhub.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;0,800;1,600&family=Outfit:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body data-page="daftar-resep" data-root="" data-access="">
-<header id="nav"></header>
-<main>
-<div class="container">
-<div class="ph"><h1>Semua resep</h1><p>Cari berdasarkan nama, bahan, kategori, waktu memasak, atau tingkat kesulitan.</p></div>
-<div class="filters">
-<div class="fld grow"><label for="fq">Cari</label><input id="fq" type="search" placeholder="Nama resep atau bahan"></div>
-<div class="fld"><label for="fk">Kategori</label><select id="fk"></select></div>
-<div class="fld"><label for="fw">Waktu memasak</label><select id="fw"><option value="0">Semua waktu</option><option value="15">Maks. 15 menit</option><option value="30">Maks. 30 menit</option><option value="60">Maks. 60 menit</option><option value="999">Lebih dari 60 menit</option></select></div>
-<div class="fld"><label for="fl">Tingkat</label><select id="fl"><option value="">Semua tingkat</option><option>Mudah</option><option>Sedang</option><option>Sulit</option></select></div>
-<button class="btn ghost" id="fr" type="button">Atur ulang</button>
-</div>
-<p id="cnt" class="muted" aria-live="polite"></p>
-<div class="grid" id="rl"></div>
-</div>
-</main>
-<footer id="foot"></footer>
-<script src="js/main.js"></script>
+  <header id="nav"></header>
+
+  <main>
+    <div class="container">
+      <div class="ph">
+        <h1>Semua resep</h1>
+        <p>Cari berdasarkan nama, bahan, kategori, waktu memasak, atau tingkat kesulitan.</p>
+      </div>
+
+      <div class="filters">
+        <div class="fld grow">
+          <label for="fq">Cari</label>
+          <input id="fq" type="search" placeholder="Nama resep atau bahan">
+        </div>
+        <div class="fld">
+          <label for="fk">Kategori</label>
+          <select id="fk"></select>
+        </div>
+        <div class="fld">
+          <label for="fw">Waktu memasak</label>
+          <select id="fw">
+            <option value="0">Semua waktu</option>
+            <option value="15">Maks. 15 menit</option>
+            <option value="30">Maks. 30 menit</option>
+            <option value="60">Maks. 60 menit</option>
+            <option value="999">Lebih dari 60 menit</option>
+          </select>
+        </div>
+        <div class="fld">
+          <label for="fl">Tingkat</label>
+          <select id="fl">
+            <option value="">Semua tingkat</option>
+            <option>Mudah</option>
+            <option>Sedang</option>
+            <option>Sulit</option>
+          </select>
+        </div>
+        <button class="btn ghost" id="fr" type="button">Atur ulang</button>
+      </div>
+
+      <p id="cnt" class="muted" aria-live="polite"></p>
+      <div class="grid" id="rl"></div>
+    </div>
+  </main>
+
+  <footer id="foot"></footer>
+
+  <script src="js/main.js"></script>
 </body>
 </html>

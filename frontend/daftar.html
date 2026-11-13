@@ -1,31 +1,59 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Daftar | FoodHub</title>
-<link rel="icon" href="img/logo-foodhub.jpg">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;0,800;1,600&family=Outfit:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Daftar | FoodHub</title>
+  <link rel="icon" href="img/logo-foodhub.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;0,800;1,600&family=Outfit:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body data-page="daftar" data-root="" data-access="">
-<header id="nav"></header>
-<main>
-<div class="container auth"><form class="formbox" id="df" novalidate>
-<h1 style="font-size:2rem">Buat akun FoodHub</h1>
-<div class="err" id="er" hidden></div>
-<div class="fld"><label for="dn">Nama</label><input id="dn" autocomplete="name" maxlength="40"></div>
-<div class="fld"><label for="de">Email</label><input id="de" type="email" autocomplete="email"></div>
-<div class="fld"><label for="dp">Kata sandi (min. 8 karakter)</label><input id="dp" type="password" autocomplete="new-password"></div>
-<div class="fld"><label for="dk">Ulangi kata sandi</label><input id="dk" type="password" autocomplete="new-password"></div>
-<label class="chk fld"><input type="checkbox" id="ds"> Saya setuju dengan syarat penggunaan FoodHub</label>
-<button class="btn" type="submit">Daftar</button>
-<p class="sm" style="margin-top:1rem">Sudah punya akun? <a href="masuk.html"><b>Masuk</b></a></p>
-</form></div>
-</main>
-<footer id="foot"></footer>
-<script src="js/main.js"></script>
+  <header id="nav"></header>
+
+  <main>
+    <div class="container auth">
+      <form class="formbox" id="df" novalidate>
+        <h1 style="font-size:2rem">Buat akun FoodHub</h1>
+        <div class="err" id="er" hidden></div>
+
+        <div class="fld">
+          <label for="dn">Nama</label>
+          <input id="dn" autocomplete="name" maxlength="40">
+        </div>
+
+        <div class="fld">
+          <label for="de">Email</label>
+          <input id="de" type="email" autocomplete="email">
+        </div>
+
+        <div class="fld">
+          <label for="dp">Kata sandi (min. 8 karakter)</label>
+          <input id="dp" type="password" autocomplete="new-password">
+        </div>
+
+        <div class="fld">
+          <label for="dk">Ulangi kata sandi</label>
+          <input id="dk" type="password" autocomplete="new-password">
+        </div>
+
+        <label class="chk fld">
+          <input type="checkbox" id="ds"> Saya setuju dengan syarat penggunaan FoodHub
+        </label>
+
+        <button class="btn" type="submit">Daftar</button>
+
+        <p class="sm" style="margin-top:1rem">
+          Sudah punya akun? <a href="masuk.html"><b>Masuk</b></a>
+        </p>
+      </form>
+    </div>
+  </main>
+
+  <footer id="foot"></footer>
+
+  <script src="js/main.js"></script>
 </body>
 </html>
