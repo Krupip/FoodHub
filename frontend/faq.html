@@ -20,12 +20,18 @@
         <p>Panduan lengkap penggunaan platform FoodHub untuk Pengunjung, Member, dan Admin.</p>
       </div>
 
-      <!-- Filter Kategori FAQ -->
-      <div class="chips" id="faqFilter" style="margin:1rem 0 2rem">
-        <button class="chip on" data-cat="all" type="button">Semua Pertanyaan</button>
-        <button class="chip" data-cat="umum" type="button">Pengunjung</button>
-        <button class="chip" data-cat="member" type="button">Member</button>
-        <button class="chip" data-cat="admin" type="button">Admin</button>
+      <!-- Filter Kategori FAQ & Tombol Tambah Pertanyaan -->
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin:1rem 0 2rem">
+        <div class="chips" id="faqFilter" style="margin:0">
+          <button class="chip on" data-cat="all" type="button">Semua Pertanyaan</button>
+          <button class="chip" data-cat="umum" type="button">Pengunjung</button>
+          <button class="chip" data-cat="member" type="button">Member</button>
+          <button class="chip" data-cat="admin" type="button">Admin</button>
+        </div>
+        <button class="btn sm" id="btnBukaModalFaq" type="button" style="display:inline-flex;align-items:center;gap:.4rem">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" y2="19"></line></svg>
+          Tambah Pertanyaan
+        </button>
       </div>
 
       <!-- Kategori 1: Pengunjung Umum -->
@@ -33,6 +39,8 @@
         <h2 style="font-size:1.35rem;margin:1.8rem 0 1rem;display:flex;align-items:center;gap:.6rem">
           <span class="tag">Umum</span> Pertanyaan Pengunjung
         </h2>
+
+        <div class="faq-custom-container" data-custom-group="umum"></div>
 
         <details>
           <summary>Apa itu FoodHub?</summary>
@@ -60,6 +68,8 @@
         <h2 style="font-size:1.35rem;margin:2.4rem 0 1rem;display:flex;align-items:center;gap:.6rem">
           <span class="tag g">Member</span> Fitur Pengguna Terdaftar
         </h2>
+
+        <div class="faq-custom-container" data-custom-group="member"></div>
 
         <details>
           <summary>Apa keuntungan mendaftar sebagai Member?</summary>
@@ -93,6 +103,8 @@
           <span class="tag r">Admin</span> Panduan Pengelola (Admin)
         </h2>
 
+        <div class="faq-custom-container" data-custom-group="admin"></div>
+
         <details>
           <summary>Bagaimana cara admin mengakses Dasbor Admin?</summary>
           <p>Masuk menggunakan akun admin (email: <code style="background:var(--sand);padding:.1em .4em;border-radius:4px">admin@foodhub.id</code>), kemudian klik menu avatar akun di pojok kanan atas navigasi dan pilih <b>Dasbor Admin</b>.</p>
@@ -117,6 +129,41 @@
           <summary>Bagaimana cara mengelola akun pengguna?</summary>
           <p>Masuk ke menu <b>Kelola Pengguna</b> pada sidebar admin untuk melihat seluruh akun yang terdaftar (nama, email, peran, tanggal bergabung) dan menghapus akun member jika diperlukan.</p>
         </details>
+      </div>
+    </div>
+
+    <!-- Modal Tambah Pertanyaan FAQ -->
+    <div class="modal-backdrop" id="modalFaq" hidden>
+      <div class="modal-box" style="max-width:540px">
+        <div class="modal-h">
+          <h2 style="font-size:1.35rem;margin:0">Tambah Pertanyaan FAQ</h2>
+          <button class="modal-close" id="btnTutupFaq" type="button" aria-label="Tutup">&times;</button>
+        </div>
+        <form id="formTambahFaq" style="display:flex;flex-direction:column;gap:1.1rem;margin-top:1rem">
+          <div>
+            <label for="faqKat" style="display:block;font-weight:600;margin-bottom:.4rem">Kategori Pertanyaan</label>
+            <select id="faqKat" required style="width:100%;padding:.7rem;border:2px solid var(--ink);border-radius:12px;font:inherit;background:#fff">
+              <option value="umum">Pengunjung (Umum)</option>
+              <option value="member" selected>Member (Pengguna Terdaftar)</option>
+              <option value="admin">Admin (Pengelola)</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="faqTanya" style="display:block;font-weight:600;margin-bottom:.4rem">Pertanyaan</label>
+            <input id="faqTanya" type="text" placeholder="Contoh: Bagaimana cara membatalkan simpan resep favorit?" required style="width:100%;padding:.7rem;border:2px solid var(--ink);border-radius:12px;font:inherit;background:#fff">
+          </div>
+
+          <div>
+            <label for="faqJawab" style="display:block;font-weight:600;margin-bottom:.4rem">Jawaban Lengkap</label>
+            <textarea id="faqJawab" rows="4" placeholder="Tuliskan jawaban atau panduan langkah-langkah di sini..." required style="width:100%;padding:.7rem;border:2px solid var(--ink);border-radius:12px;font:inherit;background:#fff;resize:vertical"></textarea>
+          </div>
+
+          <div style="display:flex;gap:.8rem;justify-content:flex-end;margin-top:.6rem">
+            <button class="btn ghost sm" type="button" id="btnBatalFaq">Batal</button>
+            <button class="btn sm" type="submit">Simpan Pertanyaan</button>
+          </div>
+        </form>
       </div>
     </div>
   </main>

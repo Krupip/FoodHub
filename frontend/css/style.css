@@ -1077,6 +1077,10 @@ th {
   padding: 1rem;
 }
 
+.modal-backdrop[hidden] {
+  display: none !important;
+}
+
 .modal-box {
   background: #fff;
   border: 2px solid var(--ink);

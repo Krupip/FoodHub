@@ -956,18 +956,130 @@
     faq() {
       const chips = $$('#faqFilter .chip');
       const groups = $$('.faq-group');
-      if (!chips.length) return;
+      const modal = $('#modalFaq');
+      const form = $('#formTambahFaq');
+      const btnBuka = $('#btnBukaModalFaq');
+      const btnTutup = $('#btnTutupFaq');
+      const btnBatal = $('#btnBatalFaq');
 
-      chips.forEach(btn => {
-        btn.addEventListener('click', () => {
-          chips.forEach(b => b.classList.remove('on'));
-          btn.classList.add('on');
-          const cat = btn.dataset.cat;
-          groups.forEach(g => {
-            g.hidden = !(cat === 'all' || g.dataset.group === cat);
+      const FAQ_KEY = 'fh_custom_faqs';
+      const getCustomFaqs = () => ld(FAQ_KEY, []);
+      const saveCustomFaqs = list => sv(FAQ_KEY, list);
+
+      const renderCustomFaqs = () => {
+        const list = getCustomFaqs();
+        $$('.faq-custom-container').forEach(c => { c.innerHTML = ''; });
+
+        list.forEach(item => {
+          const container = $(`[data-custom-group="${item.group}"]`);
+          if (!container) return;
+
+          const details = document.createElement('details');
+          details.className = 'faq-item-custom';
+          details.innerHTML = `
+            <summary>
+              <span>${esc(item.q)}</span>
+            </summary>
+            <div>
+              <p>${esc(item.a)}</p>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.8rem;padding-top:.5rem;border-top:1px dashed var(--line);font-size:.82rem">
+                <span class="muted"><span class="tag" style="font-size:.7rem;padding:.1em .5em">Kustom</span> Ditambahkan langsung</span>
+                <button type="button" class="btn danger sm" data-del-faq="${item.id}" style="padding:.2rem .6rem;font-size:.78rem">
+                  ${ic('trash')} Hapus
+                </button>
+              </div>
+            </div>
+          `;
+          container.appendChild(details);
+        });
+      };
+
+      const openModal = () => {
+        if (!modal) return;
+        const activeChip = $('#faqFilter .chip.on');
+        const activeCat = activeChip ? activeChip.dataset.cat : 'all';
+        if (activeCat && activeCat !== 'all' && $('#faqKat')) {
+          $('#faqKat').value = activeCat;
+        }
+        form?.reset();
+        modal.hidden = false;
+        $('#faqTanya')?.focus();
+      };
+
+      const closeModal = () => {
+        if (modal) modal.hidden = true;
+      };
+
+      if (btnBuka) btnBuka.addEventListener('click', openModal);
+      if (btnTutup) btnTutup.addEventListener('click', closeModal);
+      if (btnBatal) btnBatal.addEventListener('click', closeModal);
+      if (modal) {
+        modal.addEventListener('click', e => {
+          if (e.target === modal) closeModal();
+        });
+      }
+
+      if (form) {
+        form.addEventListener('submit', e => {
+          e.preventDefault();
+          const q = $('#faqTanya').value.trim();
+          const a = $('#faqJawab').value.trim();
+          const group = $('#faqKat').value;
+
+          if (!q || !a) {
+            toast('Pertanyaan dan jawaban wajib diisi.');
+            return;
+          }
+
+          const current = getCustomFaqs();
+          const newFaq = {
+            id: Date.now(),
+            group,
+            q,
+            a,
+            created_at: new Date().toISOString()
+          };
+          current.push(newFaq);
+          saveCustomFaqs(current);
+
+          renderCustomFaqs();
+          closeModal();
+          toast('Pertanyaan FAQ baru berhasil ditambahkan!');
+
+          const activeChip = $('#faqFilter .chip.on');
+          if (activeChip && activeChip.dataset.cat !== 'all' && activeChip.dataset.cat !== group) {
+            const targetChip = $(`#faqFilter .chip[data-cat="${group}"]`);
+            if (targetChip) targetChip.click();
+          }
+        });
+      }
+
+      document.addEventListener('click', e => {
+        const delBtn = e.target.closest('[data-del-faq]');
+        if (!delBtn) return;
+        const id = +delBtn.dataset.delFaq;
+        if (!confirm('Apakah Anda yakin ingin menghapus pertanyaan ini?')) return;
+
+        const current = getCustomFaqs();
+        saveCustomFaqs(current.filter(x => x.id !== id));
+        renderCustomFaqs();
+        toast('Pertanyaan FAQ berhasil dihapus.');
+      });
+
+      if (chips.length) {
+        chips.forEach(btn => {
+          btn.addEventListener('click', () => {
+            chips.forEach(b => b.classList.remove('on'));
+            btn.classList.add('on');
+            const cat = btn.dataset.cat;
+            groups.forEach(g => {
+              g.hidden = !(cat === 'all' || g.dataset.group === cat);
+            });
           });
         });
-      });
+      }
+
+      renderCustomFaqs();
     },
 
     async 'detail-resep'() {
