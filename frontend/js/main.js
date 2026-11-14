@@ -1431,14 +1431,6 @@
             ? nx
             : (U.role === 'admin' ? 'admin/dasbor.html' : 'index.html');
         } catch (err) {
-          // Offline fallback
-          const u = users().find(x => x.email.toLowerCase() === em && x.pass === pw);
-          if (u) {
-            U = u;
-            setSess(U, $('#ing').checked);
-            location.href = u.role === 'admin' ? 'admin/dasbor.html' : 'index.html';
-            return;
-          }
           bar(er, err.message || 'Email atau kata sandi salah.');
         }
       });

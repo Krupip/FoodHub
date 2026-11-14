@@ -260,6 +260,95 @@ PHP;
     $response = request($baseUrl, '/auth?action=register', 'POST', json_encode($boundary, JSON_THROW_ON_ERROR));
     expect($response['status'] === 201 && $response['body']['user']['name'] === $boundary['name'], 'Nama Unicode 100 karakter dan password 72 byte diterima.');
 
+    $response = request($baseUrl, '/auth?action=login');
+    expectError($response, 405, 'Login hanya menerima POST.');
+    expect(in_array('Allow: POST', $response['headers'], true), 'Login mengirim header Allow: POST.');
+    expectError(request($baseUrl, '/auth?action=login', 'POST', '{}', 'text/plain'), 415, 'Login mensyaratkan Content-Type JSON.');
+    expectError(request($baseUrl, '/auth?action=login', 'POST', '{'), 400, 'Login menolak JSON rusak.');
+    expectError(request($baseUrl, '/auth?action=login', 'POST', '[]'), 400, 'Login menolak body bukan objek.');
+    expectError(request($baseUrl, '/auth?action=login', 'POST', '{}'), 422, 'Login menolak field wajib yang tidak tersedia.');
+
+    $login = ['email' => $registration['email'], 'password' => $registration['password']];
+    $invalidLogins = [
+        'email kosong' => ['email' => '  '],
+        'email tidak valid' => ['email' => 'bukan-email'],
+        'email terlalu panjang' => ['email' => str_repeat('a', 60) . '@' . str_repeat('b', 60) . '.' . str_repeat('c', 30)],
+        'email bukan teks' => ['email' => ['admin@example.test']],
+        'email null' => ['email' => null],
+        'password kosong' => ['password' => ''],
+        'password lebih dari 72 byte' => ['password' => str_repeat('a', 73)],
+        'password multibyte lebih dari 72 byte' => ['password' => str_repeat('界', 25)],
+        'password mengandung null' => ['password' => "password\0aman"],
+        'password bukan teks' => ['password' => 12345678],
+        'password null' => ['password' => null],
+        'remember berupa teks' => ['remember' => 'false'],
+        'remember berupa angka' => ['remember' => 1],
+        'remember berupa array' => ['remember' => []],
+        'remember null' => ['remember' => null],
+    ];
+    foreach ($invalidLogins as $description => $overrides) {
+        $body = json_encode(array_replace($login, $overrides), JSON_THROW_ON_ERROR);
+        expectError(request($baseUrl, '/auth?action=login', 'POST', $body), 422, 'Login menolak ' . $description . '.');
+    }
+    foreach (['email', 'password'] as $field) {
+        $input = $login;
+        unset($input[$field]);
+        expectError(request($baseUrl, '/auth?action=login', 'POST', json_encode($input, JSON_THROW_ON_ERROR)), 422, 'Field login wajib diperiksa: ' . $field);
+    }
+
+    $wrongPassword = request($baseUrl, '/auth?action=login', 'POST', json_encode(array_replace($login, ['password' => 'salah']), JSON_THROW_ON_ERROR));
+    $unknownEmail = request($baseUrl, '/auth?action=login', 'POST', json_encode(array_replace($login, ['email' => $testPrefix . '-missing@example.test']), JSON_THROW_ON_ERROR));
+    expectError($wrongPassword, 401, 'Password salah ditolak dengan 401, bukan aturan panjang registrasi.');
+    expectError($unknownEmail, 401, 'Email tidak terdaftar ditolak dengan 401.');
+    expect($wrongPassword['body'] === ['error' => 'Email atau kata sandi salah.'] && $unknownEmail['body'] === $wrongPassword['body'], 'Pesan kredensial salah tidak membocorkan keberadaan email.');
+    foreach ([$wrongPassword, $unknownEmail] as $failedLogin) {
+        expect(stripos(implode("\n", $failedLogin['headers']), 'Set-Cookie:') === false, 'Login gagal tanpa sesi tidak membuat cookie login.');
+    }
+
+    $seed = request($baseUrl, '/seed-session');
+    $oldLoginCookie = sessionCookie($seed);
+    $login['role'] = 'admin';
+    $login['user_id'] = 1;
+    $response = request($baseUrl, '/auth?action=login', 'POST', json_encode($login, JSON_THROW_ON_ERROR), 'application/json', $oldLoginCookie);
+    expect($response['status'] === 200 && $response['body'] === ['user' => $user], 'Login member berhasil; ID dan role berasal dari database, bukan input.');
+    expect(!array_key_exists('password', $response['body']['user']) && !array_key_exists('password_hash', $response['body']['user']), 'Respons login tidak menyertakan password atau hash.');
+    $loginCookie = sessionCookie($response);
+    expect($loginCookie !== $oldLoginCookie, 'ID sesi diregenerasi setelah verifikasi login berhasil.');
+    $headers = implode("\n", $response['headers']);
+    expect(stripos($headers, 'HttpOnly') !== false && stripos($headers, 'SameSite=Lax') !== false, 'Cookie login memakai HttpOnly dan SameSite=Lax.');
+    expect(stripos($headers, 'expires=') === false && stripos($headers, 'Max-Age=') === false, 'Login tanpa remember menggunakan cookie sesi nonpersisten.');
+    $session = request($baseUrl, '/session', 'GET', null, 'application/json', $loginCookie);
+    expect($session['body']['session'] === ['user_id' => $user['id']], 'Login menyimpan hanya user_id dan menghapus data sesi lama.');
+    $oldSession = request($baseUrl, '/session', 'GET', null, 'application/json', $oldLoginCookie);
+    expect(!isset($oldSession['body']['session']['user_id']), 'Cookie lama tidak dapat mengakses sesi login baru.');
+
+    $failedWithSession = request($baseUrl, '/auth?action=login', 'POST', json_encode(array_replace($login, ['email' => $testEmails[1], 'password' => 'salah']), JSON_THROW_ON_ERROR), 'application/json', $loginCookie);
+    expectError($failedWithSession, 401, 'Kredensial salah tetap ditolak meskipun browser sudah memiliki sesi.');
+    $session = request($baseUrl, '/session', 'GET', null, 'application/json', $loginCookie);
+    expect($session['body']['session'] === ['user_id' => $user['id']], 'Login gagal tidak mengganti identitas sesi aktif.');
+    $trimmedPassword = request($baseUrl, '/auth?action=login', 'POST', json_encode(array_replace($login, ['password' => trim($login['password'])]), JSON_THROW_ON_ERROR));
+    expectError($trimmedPassword, 401, 'Spasi password tidak dihapus saat verifikasi login.');
+
+    foreach ([false, true] as $remember) {
+        $response = request($baseUrl, '/auth?action=login', 'POST', json_encode(array_replace($login, ['remember' => $remember]), JSON_THROW_ON_ERROR));
+        expect($response['status'] === 200 && $response['body'] === ['user' => $user], 'Login menerima boolean remember=' . ($remember ? 'true' : 'false') . '.');
+        $headers = implode("\n", $response['headers']);
+        expect(stripos($headers, 'expires=') === false && stripos($headers, 'Max-Age=') === false, 'Remember belum menerbitkan cookie login persisten.');
+    }
+
+    // Hanya akun acak milik pengujian yang diubah; akun admin asli tidak disentuh.
+    $stmt = $testPdo->prepare("UPDATE users SET role = 'admin' WHERE email = ?");
+    $stmt->execute([$testEmails[1]]);
+    $adminLogin = ['email' => $testEmails[1], 'password' => $boundary['password'], 'role' => 'member'];
+    $response = request($baseUrl, '/auth?action=login', 'POST', json_encode($adminLogin, JSON_THROW_ON_ERROR));
+    expect($response['status'] === 200 && $response['body']['user']['role'] === 'admin' && $response['body']['user']['name'] === $boundary['name'], 'Login admin dan password 72 byte berhasil memakai data database.');
+    $adminId = $response['body']['user']['id'];
+    $adminSession = request($baseUrl, '/session', 'GET', null, 'application/json', sessionCookie($response));
+    expect($adminSession['body']['session'] === ['user_id' => $adminId], 'Sesi login admin berisi ID akun yang benar.');
+    $stmt = $testPdo->prepare('SELECT password_hash FROM users WHERE email = ?');
+    $stmt->execute([$testEmails[0]]);
+    expect($stmt->fetchColumn() === $storedUser['password_hash'], 'Login tidak mengubah hash password yang sudah tersimpan.');
+
     echo 'Semua pengujian lulus; akun dan sesi khusus pengujian dibersihkan setelah selesai.', PHP_EOL;
 } catch (Throwable $exception) {
     fwrite(STDERR, '[GAGAL] ' . $exception->getMessage() . PHP_EOL);

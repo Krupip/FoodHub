@@ -66,7 +66,7 @@ frontend/
 
 ## Akun Demo Pengujian
 
-Untuk mencoba fitur Member dan Admin secara langsung:
+Akun berikut tersedia pada data awal database. Login memerlukan backend PHP dan database aktif serta data akun yang sesuai; akun demo lokal tidak lagi dipakai sebagai fallback ketika request login gagal. Integrasi status login setelah pindah halaman masih menunggu endpoint `auth.php?action=me` (tahap 8C).
 
 | Email | Kata Sandi | Peran | Hak Akses |
 |---|---|---|---|
@@ -82,7 +82,7 @@ Frontend dibangun dengan pendekatan **Hybrid Client Architecture**:
 1. **Mode Online (Backend Terhubung)**:  
    `main.js` mengirim permintaan asinkron (`fetch()`) ke endpoint PHP di `../backend/api/` (`auth.php`, `recipes.php`, `favorites.php`, `reviews.php`, `profile.php`, `admin/recipes.php`).
 2. **Mode Offline (Backend Belum Aktif / Demo Standalone)**:  
-   Jika backend PHP belum dinyalakan atau gagal dijangkau, antarmuka otomatis beralih (*fallback*) menggunakan data lokal di memori dan `localStorage` peramban. Seluruh fungsi navigasi, penambahan resep, favorit, filter, dan FAQ tetap dapat diuji tanpa hambatan *error*.
+   Sejumlah halaman masih memakai data lokal di memori dan `localStorage` saat API gagal, misalnya untuk menampilkan katalog dan FAQ. **Login dan registrasi memerlukan backend:** kegagalan request login ditampilkan sebagai error, bukan digantikan login akun demo. Fallback sesi pada inisialisasi halaman masih ada dan akan ditinjau saat integrasi autentikasi diselesaikan; tampilan lokal tidak membuktikan pengguna sudah terautentikasi di server.
 
 ---
 

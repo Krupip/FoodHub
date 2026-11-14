@@ -216,7 +216,7 @@ Contoh respons (ID mengikuti database):
 
 Respons tidak menyertakan password atau hash. Registrasi memulai sesi, meregenerasi ID sesi, lalu menyimpan hanya `user_id` sebagai identitas login. Data sesi sebelumnya diganti pada registrasi berhasil. Cookie bernama `foodhub_session` memakai `HttpOnly`, `SameSite=Lax`, serta `Secure` ketika request terdeteksi menggunakan HTTPS langsung. Cookie tidak diberi masa berlaku persisten (`lifetime = 0`). Jika HTTPS diterminasi di reverse proxy, konfigurasi deteksi HTTPS harus disesuaikan dengan proxy tepercaya sebelum deployment.
 
-**Batas implementasi:** sesi login sudah dibuat di server, tetapi `action=login`, `action=me`, dan `action=logout` belum tersedia. Frontend memanggil `action=me` saat setiap halaman dimuat, sehingga status login belum dapat ditampilkan secara konsisten setelah redirect/reload sampai tahap 8C selesai. Jangan menganggap tampilan mode demo sebagai bukti sesi backend. Aksi selain `register` saat ini mengembalikan `404`.
+**Batas implementasi:** registrasi dan login sudah membuat sesi di server, tetapi `action=me` dan `action=logout` belum tersedia. Frontend memanggil `action=me` saat setiap halaman dimuat, sehingga status login belum dapat ditampilkan secara konsisten setelah redirect/reload sampai tahap 8C selesai. Jangan menganggap tampilan mode demo sebagai bukti sesi backend. Aksi selain `register` dan `login` saat ini mengembalikan `404`.
 
 ### Respons gagal
 
@@ -244,6 +244,92 @@ Gunakan Postman untuk mengirim request POST di atas dan pilih Body → raw → J
 
 Form `frontend/daftar.html` sudah mengirim request ke endpoint ini. Untuk memeriksa prosesnya, buka Developer Tools → Network dengan opsi Preserve log karena frontend melakukan redirect setelah pendaftaran berhasil. Membuka URL endpoint di address bar browser hanya mengirim GET dan seharusnya menghasilkan `405`, bukan membuat akun.
 
+## API login
+
+### Request
+
+```http
+POST /FoodHub/backend/api/auth.php?action=login
+Content-Type: application/json
+```
+
+Contoh body:
+
+```json
+{
+  "email": "budi@example.com",
+  "password": "passwordcontoh123",
+  "remember": false
+}
+```
+
+Gunakan akun yang sudah dibuat melalui registrasi atau akun lokal yang memang tersedia di database.
+
+| Field | Aturan |
+|---|---|
+| `email` | Wajib berupa teks dengan format valid; spasi awal/akhir dihapus, dinormalisasi menjadi huruf kecil, maksimal 150 karakter |
+| `password` | Wajib berupa teks tidak kosong, maksimal 72 byte, tanpa karakter null; tidak di-trim |
+| `remember` | Opsional; jika dikirim harus berupa boolean JSON (`true` atau `false`), bukan teks/angka/null |
+
+Batas minimal 8 karakter hanya diterapkan saat membuat password melalui registrasi. Login memverifikasi password yang tersimpan dan tidak menerapkan ulang batas minimum registrasi pada password lama.
+
+**Opsi Ingat saya:** `remember` diterima untuk kompatibilitas dengan frontend, tetapi baik `true` maupun `false` saat ini tetap membuat cookie sesi nonpersisten. Belum ada token login persisten, pemulihan login setelah browser ditutup, atau tabel penyimpanan token. Jangan menganggap pengaturan `localStorage` frontend sebagai login persisten yang aman. Fitur tersebut memerlukan implementasi token terpisah.
+
+### Alur login
+
+1. Validasi method, JSON, dan field.
+2. Cari pengguna berdasarkan email menggunakan prepared statement.
+3. Periksa password dengan `password_verify()`. Untuk email tidak terdaftar, verifikasi tetap dijalankan terhadap hash dummy agar tidak langsung keluar tanpa proses bcrypt.
+4. Tolak kredensial salah dengan pesan yang sama, tanpa memberi tahu apakah email terdaftar.
+5. Setelah kredensial benar, mulai sesi dan regenerasi ID-nya.
+6. Ganti data sesi menjadi hanya `user_id`, lalu simpan sesi.
+7. Kirim informasi pengguna dari database tanpa password atau hash. ID dan role dari body request tidak digunakan.
+
+### Respons berhasil — 200
+
+Contoh respons (data mengikuti akun di database):
+
+```json
+{
+  "user": {
+    "id": 4,
+    "name": "Budi Santoso",
+    "email": "budi@example.com",
+    "role": "member"
+  }
+}
+```
+
+Akun admin mengembalikan `role: "admin"` sesuai database. Login gagal tidak membuat sesi login baru atau mengganti identitas sesi yang sudah aktif. Pengaturan cookie sama dengan sesi registrasi: `HttpOnly`, `SameSite=Lax`, dan `Secure` saat HTTPS terdeteksi.
+
+### Respons gagal
+
+| Status | Kondisi |
+|---|---|
+| `400` | Body kosong, JSON rusak, atau bukan objek |
+| `401` | Email tidak terdaftar atau password salah |
+| `405` | Method selain POST; header `Allow: POST` |
+| `415` | Content-Type bukan JSON |
+| `422` | Field wajib, tipe, format, atau batas nilai tidak sesuai |
+| `500` | Kesalahan database/sesi/internal |
+
+Respons kredensial salah:
+
+```json
+{
+  "error": "Email atau kata sandi salah."
+}
+```
+
+### Pengujian manual dan integrasi frontend
+
+- Di Postman, kirim request login dengan akun yang benar. Pastikan status `200`, respons `user`, dan cookie `foodhub_session` diterima.
+- Coba password salah dan email yang tidak terdaftar. Keduanya harus menghasilkan `401` dengan pesan yang sama.
+- Buka `frontend/masuk.html` melalui web server. Handler login sudah memakai endpoint ini dan kini tidak lagi mencoba akun demo lokal jika API menolak request atau tidak dapat dihubungi.
+- Pemeriksaan sesi ketika halaman dimuat (`initAuth`) masih memiliki fallback demo lama dan belum terhubung ke endpoint `me`. Login end-to-end lintas halaman baru dapat diuji sepenuhnya setelah tahap 8C; logout menunggu tahap 8D. Pengujian otomatis memeriksa sesi melalui route khusus pada router sementara, bukan endpoint publik tambahan.
+
+Sebelum digunakan di produksi, tambahkan pembatasan percobaan login dan mekanisme login persisten jika dibutuhkan. Tahap ini belum menerapkan rate limiting.
+
 ## Pengujian otomatis
 
 Dari direktori utama proyek, jalankan:
@@ -267,7 +353,12 @@ Pengujian mencakup:
 - Cookie sesi, regenerasi ID, sesi login pada request berikutnya, serta penolakan cookie sesi lama.
 - Email duplikat menghasilkan `409` tanpa membuat akun kedua atau mengganti identitas login.
 - Batas nama Unicode 100 karakter dan password 72 byte.
+- Login: method, JSON, field wajib, tipe field, batas nilai, serta boolean `remember`.
+- Password salah dan email tidak terdaftar menghasilkan `401` dengan pesan yang sama.
+- Login member/admin, normalisasi email, password dengan spasi, serta respons tanpa password/hash.
+- Regenerasi ID sesi saat login, penolakan cookie lama, dan identitas sesi yang tetap utuh jika login berikutnya gagal.
+- Login dengan `remember` tidak menerbitkan cookie persisten sebelum fitur token diimplementasikan.
 
-**Pengujian registrasi menulis ke database lokal:** script membuat dua akun dengan alamat email acak khusus pengujian, lalu menghapus hanya akun tersebut dalam blok `finally`, termasuk ketika assertion gagal. Sesi pengujian menggunakan direktori sementara terpisah yang juga dibersihkan. Akun yang sudah ada tidak diubah. Gunakan database pengembangan, bukan database produksi. Jika proses dihentikan paksa sebelum cleanup berjalan, akun uji berawalan `foodhub-test-` dapat tertinggal dan harus diperiksa secara manual.
+**Pengujian autentikasi menulis ke database lokal:** script membuat dua akun dengan alamat email acak khusus pengujian, mengubah salah satu akun uji menjadi admin untuk memeriksa login berdasarkan role, lalu menghapus hanya akun uji tersebut dalam blok `finally`, termasuk ketika assertion gagal. Sesi pengujian menggunakan direktori sementara terpisah yang juga dibersihkan. Akun yang sudah ada tidak diubah. Gunakan database pengembangan, bukan database produksi. Jika proses dihentikan paksa sebelum cleanup berjalan, akun uji berawalan `foodhub-test-` dapat tertinggal dan harus diperiksa secara manual.
 
-Endpoint resep, profil, favorit, ulasan, admin, serta aksi login/me/logout belum diimplementasikan.
+Endpoint resep, profil, favorit, ulasan, admin, serta aksi me/logout belum diimplementasikan.

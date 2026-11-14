@@ -6,21 +6,24 @@ require_once __DIR__ . '/../includes/bootstrap.php';
 
 $action = $_GET['action'] ?? '';
 
-if ($action !== 'register') {
+if (!in_array($action, ['register', 'login'], true)) {
     sendErrorResponse('Aksi autentikasi tidak ditemukan.', 404);
 }
 
 requireRequestMethod('POST');
 $input = readJsonBody();
+$name = $input['name'] ?? null;
 
-if (!isset($input['name']) || !is_string($input['name'])) {
-    sendErrorResponse('Nama wajib diisi dengan teks.', 422);
-}
+if ($action === 'register') {
+    if (!is_string($name)) {
+        sendErrorResponse('Nama wajib diisi dengan teks.', 422);
+    }
 
-$name = trim($input['name']);
+    $name = trim($name);
 
-if (mb_strlen($name, 'UTF-8') < 3 || mb_strlen($name, 'UTF-8') > 100) {
-    sendErrorResponse('Nama harus terdiri dari 3 sampai 100 karakter.', 422);
+    if (mb_strlen($name, 'UTF-8') < 3 || mb_strlen($name, 'UTF-8') > 100) {
+        sendErrorResponse('Nama harus terdiri dari 3 sampai 100 karakter.', 422);
+    }
 }
 
 if (!isset($input['email']) || !is_string($input['email'])) {
@@ -40,11 +43,48 @@ if (!isset($input['password']) || !is_string($input['password'])) {
 $password = $input['password'];
 
 // Bcrypt hanya memproses 72 byte pertama; tolak kelebihan agar tidak terpotong diam-diam.
-if (mb_strlen($password, 'UTF-8') < 8 || strlen($password) > 72 || str_contains($password, "\0")) {
-    sendErrorResponse('Kata sandi minimal 8 karakter, maksimal 72 byte, dan tidak boleh mengandung karakter null.', 422);
+$minimumPasswordLength = $action === 'register' ? 8 : 1;
+if (mb_strlen($password, 'UTF-8') < $minimumPasswordLength || strlen($password) > 72 || str_contains($password, "\0")) {
+    sendErrorResponse(
+        "Kata sandi minimal {$minimumPasswordLength} karakter, maksimal 72 byte, dan tidak boleh mengandung karakter null.",
+        422
+    );
+}
+
+if ($action === 'login' && array_key_exists('remember', $input) && !is_bool($input['remember'])) {
+    sendErrorResponse('Pilihan ingat saya harus berupa boolean.', 422);
 }
 
 $pdo = getDatabaseConnection();
+
+if ($action === 'login') {
+    $stmt = $pdo->prepare(
+        'SELECT id, name, email, password_hash, role FROM users WHERE email = ? LIMIT 1'
+    );
+    $stmt->execute([$email]);
+    $user = $stmt->fetch();
+
+    // Tetap jalankan bcrypt untuk email yang tidak terdaftar, bukan langsung menolak.
+    $hash = $user['password_hash'] ?? '$2y$10$Ze7J8IGfmg96sWhw3HtequUFSeDSM8AYX/Ht8QkgenAHGk1v/srCi';
+    $passwordMatches = password_verify($password, $hash);
+
+    if ($user === false || !$passwordMatches) {
+        sendErrorResponse('Email atau kata sandi salah.', 401);
+    }
+
+    startUserSession();
+    if (!session_regenerate_id(true)) {
+        throw new RuntimeException('Tidak dapat memperbarui sesi pengguna.');
+    }
+
+    $user['id'] = (int) $user['id'];
+    $_SESSION = ['user_id' => $user['id']];
+    session_write_close();
+
+    unset($user['password_hash']);
+    sendJsonResponse(['user' => $user]);
+}
+
 $passwordHash = password_hash($password, PASSWORD_BCRYPT);
 
 // Pastikan penyimpanan sesi dapat dimulai sebelum membuat akun di database.
