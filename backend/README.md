@@ -5,7 +5,7 @@
 ### 1. Persiapan
 
 - Jalankan MySQL/MariaDB melalui Laragon.
-- Pastikan PHP mengaktifkan ekstensi `pdo_mysql`.
+- Pastikan PHP mengaktifkan ekstensi `pdo_mysql` dan `mbstring` (untuk validasi panjang nama/password Unicode pada registrasi).
 - Import `database/foodhub.sql` jika database belum tersedia. **File tersebut menghapus database `foodhub` yang sudah ada sebelum membuat ulang. Backup data penting terlebih dahulu.**
 
 ### 2. Konfigurasi lokal
@@ -82,8 +82,9 @@ File bersama yang tersedia:
 | `includes/bootstrap.php` | Memuat helper dan koneksi, mengatur header keamanan/cache, serta menangani error internal |
 | `includes/response.php` | Menyediakan `sendJsonResponse()` dan `sendErrorResponse()` |
 | `includes/validation.php` | Menyediakan `requireRequestMethod()` dan `readJsonBody()` |
+| `includes/auth.php` | Menyediakan `startUserSession()` untuk memulai sesi pengguna dengan cookie aman |
 
-Muat bootstrap di awal endpoint, sebelum mencetak output. Koneksi database baru dibuka ketika `getDatabaseConnection()` dipanggil. Bootstrap belum memulai session atau menerapkan autentikasi; fitur tersebut dikerjakan pada tahap berikutnya.
+Muat bootstrap di awal endpoint, sebelum mencetak output. Koneksi database baru dibuka ketika `getDatabaseConnection()` dipanggil. Session baru dimulai saat `startUserSession()` dipanggil; endpoint publik seperti kategori tidak membuat sesi. Pemeriksaan izin login/admin belum diimplementasikan.
 
 Contoh pola untuk endpoint POST mendatang (bukan endpoint baru yang sudah diimplementasikan):
 
@@ -167,6 +168,82 @@ http://localhost/FoodHub/backend/api/categories.php
 
 Alamat ini berlaku jika web server menggunakan folder `www` sebagai document root. Respons seharusnya berupa JSON, bukan halaman HTML. Buka beranda frontend dan periksa Developer Tools → Network → `categories.php`; statusnya harus `200` dengan data kategori. Frontend memiliki fallback lokal, jadi tampilan kategori saja belum membuktikan API berhasil.
 
+## API registrasi
+
+### Request
+
+```http
+POST /FoodHub/backend/api/auth.php?action=register
+Content-Type: application/json
+```
+
+Contoh body:
+
+```json
+{
+  "name": "Budi Santoso",
+  "email": "budi@example.com",
+  "password": "passwordcontoh123"
+}
+```
+
+Aturan validasi:
+
+| Field | Aturan |
+|---|---|
+| `name` | Wajib berupa teks; spasi di awal/akhir dihapus; panjang 3–100 karakter Unicode |
+| `email` | Wajib berupa teks dengan format email valid; spasi di awal/akhir dihapus; dinormalisasi menjadi huruf kecil; maksimal 150 karakter |
+| `password` | Wajib berupa teks; minimal 8 karakter Unicode, maksimal 72 byte, dan tidak mengandung karakter null; spasi password dipertahankan |
+
+Batas 72 byte mencegah pemotongan password diam-diam oleh bcrypt. Untuk karakter multibyte, 72 byte bisa berarti kurang dari 72 karakter. Password disimpan menggunakan `password_hash(..., PASSWORD_BCRYPT)`, bukan teks asli. Unique constraint database menangani email duplikat, termasuk jika dua request dengan email yang sama datang bersamaan.
+
+Role selalu ditetapkan sebagai `member` di server. Field tambahan seperti `role` dan `id` dari klien tidak digunakan. Konfirmasi password dan persetujuan pada form tetap diperiksa frontend; endpoint menerima tiga field di atas sesuai kontrak JavaScript saat ini.
+
+### Respons berhasil — 201
+
+Contoh respons (ID mengikuti database):
+
+```json
+{
+  "user": {
+    "id": 4,
+    "name": "Budi Santoso",
+    "email": "budi@example.com",
+    "role": "member"
+  }
+}
+```
+
+Respons tidak menyertakan password atau hash. Registrasi memulai sesi, meregenerasi ID sesi, lalu menyimpan hanya `user_id` sebagai identitas login. Data sesi sebelumnya diganti pada registrasi berhasil. Cookie bernama `foodhub_session` memakai `HttpOnly`, `SameSite=Lax`, serta `Secure` ketika request terdeteksi menggunakan HTTPS langsung. Cookie tidak diberi masa berlaku persisten (`lifetime = 0`). Jika HTTPS diterminasi di reverse proxy, konfigurasi deteksi HTTPS harus disesuaikan dengan proxy tepercaya sebelum deployment.
+
+**Batas implementasi:** sesi login sudah dibuat di server, tetapi `action=login`, `action=me`, dan `action=logout` belum tersedia. Frontend memanggil `action=me` saat setiap halaman dimuat, sehingga status login belum dapat ditampilkan secara konsisten setelah redirect/reload sampai tahap 8C selesai. Jangan menganggap tampilan mode demo sebagai bukti sesi backend. Aksi selain `register` saat ini mengembalikan `404`.
+
+### Respons gagal
+
+| Status | Kondisi |
+|---|---|
+| `400` | Body kosong, JSON rusak, atau bukan objek |
+| `404` | Aksi autentikasi tidak tersedia |
+| `405` | Method selain POST untuk registrasi; header `Allow: POST` |
+| `409` | Email sudah terdaftar |
+| `415` | Content-Type bukan `application/json` |
+| `422` | Field wajib tidak ada, tipe salah, atau nilai tidak memenuhi validasi |
+| `500` | Kesalahan database/sesi/internal; detail hanya dicatat ke log |
+
+Contoh email duplikat:
+
+```json
+{
+  "error": "Email sudah terdaftar."
+}
+```
+
+### Pengujian manual
+
+Gunakan Postman untuk mengirim request POST di atas dan pilih Body → raw → JSON. Request berhasil menghasilkan `201`, data `user`, dan cookie sesi. Periksa tabel `users` untuk memastikan password tersimpan sebagai hash. Kirim ulang email yang sama untuk memeriksa respons `409`.
+
+Form `frontend/daftar.html` sudah mengirim request ke endpoint ini. Untuk memeriksa prosesnya, buka Developer Tools → Network dengan opsi Preserve log karena frontend melakukan redirect setelah pendaftaran berhasil. Membuka URL endpoint di address bar browser hanya mengirim GET dan seharusnya menghasilkan `405`, bukan membuat akun.
+
 ## Pengujian otomatis
 
 Dari direktori utama proyek, jalankan:
@@ -175,7 +252,7 @@ Dari direktori utama proyek, jalankan:
 php backend/tests/api.php
 ```
 
-Syarat: PHP CLI dengan `pdo_mysql`, `proc_open` dan HTTP stream aktif, serta database lokal yang sudah dikonfigurasi. Script menjalankan server PHP sementara pada port lokal yang tersedia, kemudian menghentikannya dan menghapus router sementara setelah selesai. Tidak perlu menjalankan server pengujian sendiri.
+Syarat: PHP CLI dengan `pdo_mysql`, `mbstring`, session, `proc_open` dan HTTP stream aktif, serta database lokal yang sudah dikonfigurasi. Script menjalankan server PHP sementara pada port lokal yang tersedia, kemudian menghentikannya dan menghapus router sementara setelah selesai. Tidak perlu menjalankan server pengujian sendiri.
 
 Pengujian mencakup:
 
@@ -185,4 +262,12 @@ Pengujian mencakup:
 - Penolakan Content-Type salah (`415`), body kosong, JSON rusak, dan body bukan objek (`400`).
 - Respons sukses `201` dan penanganan exception/warning/error encoding sebagai JSON `500` tanpa detail internal.
 
-Pengujian hanya membaca database, tidak membuat atau mengubah data. Endpoint autentikasi, resep, profil, favorit, ulasan, dan admin belum diimplementasikan.
+- Validasi registrasi: method, aksi tidak tersedia, tipe konten, JSON, field wajib, tipe field, batas panjang, dan password dengan karakter null.
+- Registrasi berhasil, normalisasi nama/email, role selalu member, hash password, dan respons tanpa kredensial.
+- Cookie sesi, regenerasi ID, sesi login pada request berikutnya, serta penolakan cookie sesi lama.
+- Email duplikat menghasilkan `409` tanpa membuat akun kedua atau mengganti identitas login.
+- Batas nama Unicode 100 karakter dan password 72 byte.
+
+**Pengujian registrasi menulis ke database lokal:** script membuat dua akun dengan alamat email acak khusus pengujian, lalu menghapus hanya akun tersebut dalam blok `finally`, termasuk ketika assertion gagal. Sesi pengujian menggunakan direktori sementara terpisah yang juga dibersihkan. Akun yang sudah ada tidak diubah. Gunakan database pengembangan, bukan database produksi. Jika proses dihentikan paksa sebelum cleanup berjalan, akun uji berawalan `foodhub-test-` dapat tertinggal dan harus diperiksa secara manual.
+
+Endpoint resep, profil, favorit, ulasan, admin, serta aksi login/me/logout belum diimplementasikan.

@@ -16,11 +16,11 @@ function expect(bool $condition, string $message): void
     echo '[OK] ', $message, PHP_EOL;
 }
 
-function request(string $baseUrl, string $path, string $method = 'GET', ?string $body = null, string $contentType = 'application/json'): array
+function request(string $baseUrl, string $path, string $method = 'GET', ?string $body = null, string $contentType = 'application/json', string $cookie = ''): array
 {
     $options = [
         'method' => $method,
-        'header' => 'Content-Type: ' . $contentType,
+        'header' => 'Content-Type: ' . $contentType . ($cookie !== '' ? "\r\nCookie: " . $cookie : ''),
         'ignore_errors' => true,
         'timeout' => 3,
     ];
@@ -55,18 +55,49 @@ function expectError(array $response, int $status, string $message): void
     );
 }
 
+function sessionCookie(array $response): string
+{
+    foreach ($response['headers'] as $header) {
+        if (stripos($header, 'Set-Cookie: foodhub_session=') === 0) {
+            return explode(';', substr($header, strlen('Set-Cookie: ')))[0];
+        }
+    }
+
+    throw new RuntimeException('Cookie sesi tidak ditemukan.');
+}
+
 $routerPath = tempnam(sys_get_temp_dir(), 'foodhub-api-');
 $log = tmpfile();
 $server = null;
+$testPdo = null;
+$sessionDirectory = null;
+$testPrefix = 'foodhub-test-' . bin2hex(random_bytes(16));
+$testEmails = [$testPrefix . '@example.test', $testPrefix . '-boundary@example.test'];
 $exitCode = 0;
 
 try {
     $backendPath = dirname(__DIR__);
+    require_once $backendPath . '/config/database.php';
+    $testPdo = getDatabaseConnection();
+    $sessionDirectory = sys_get_temp_dir() . '/foodhub-sessions-' . bin2hex(random_bytes(8));
+    mkdir($sessionDirectory, 0700);
+
     $router = '<?php require_once ' . var_export($backendPath . '/includes/bootstrap.php', true) . ';';
     $router .= '$categoriesPath = ' . var_export($backendPath . '/api/categories.php', true) . ';';
+    $router .= '$authPath = ' . var_export($backendPath . '/api/auth.php', true) . ';';
     $router .= <<<'PHP'
 
 switch (parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH)) {
+    case '/auth':
+        require $authPath;
+        exit;
+    case '/seed-session':
+        startUserSession();
+        $_SESSION['legacy'] = true;
+        sendJsonResponse(['session_id' => session_id()]);
+    case '/session':
+        startUserSession();
+        sendJsonResponse(['session' => $_SESSION]);
     case '/categories':
         require $categoriesPath;
         exit;
@@ -96,7 +127,7 @@ PHP;
     fclose($socket);
 
     $server = proc_open(
-        [PHP_BINARY, '-S', $address, '-t', dirname($backendPath), $routerPath],
+        [PHP_BINARY, '-d', 'session.save_path=' . $sessionDirectory, '-S', $address, '-t', dirname($backendPath), $routerPath],
         [0 => ['pipe', 'r'], 1 => $log, 2 => $log],
         $pipes
     );
@@ -157,7 +188,79 @@ PHP;
         expect($response['body'] === ['error' => 'Terjadi kesalahan pada server. Silakan coba lagi nanti.'], 'Detail internal tidak bocor: ' . $path);
     }
 
-    echo 'Semua pengujian lulus; tidak ada data database yang diubah.', PHP_EOL;
+    expectError(request($baseUrl, '/auth?action=register'), 405, 'Registrasi hanya menerima POST.');
+    expectError(request($baseUrl, '/auth?action=unknown', 'POST', '{}'), 404, 'Aksi autentikasi tidak dikenal ditolak.');
+    expectError(request($baseUrl, '/auth?action[]=register', 'POST', '{}'), 404, 'Aksi autentikasi berbentuk array ditolak tanpa error internal.');
+    expectError(request($baseUrl, '/auth?action=register', 'POST', '{}', 'text/plain'), 415, 'Registrasi mensyaratkan Content-Type JSON.');
+    expectError(request($baseUrl, '/auth?action=register', 'POST', '{'), 400, 'Registrasi menolak JSON rusak.');
+    expectError(request($baseUrl, '/auth?action=register', 'POST', '[]'), 400, 'Registrasi menolak body bukan objek.');
+    expectError(request($baseUrl, '/auth?action=register', 'POST', '{}'), 422, 'Registrasi menolak field wajib yang tidak tersedia.');
+
+    $registration = ['name' => '  Pengguna Uji ✓  ', 'email' => '  ' . strtoupper($testEmails[0]) . '  ', 'password' => ' password aman 123 '];
+    $invalidInputs = [
+        'nama terlalu pendek' => ['name' => ' ab '],
+        'nama terlalu panjang' => ['name' => str_repeat('界', 101)],
+        'nama bukan teks' => ['name' => ['admin']],
+        'email tidak valid' => ['email' => 'bukan-email'],
+        'email terlalu panjang' => ['email' => str_repeat('a', 60) . '@' . str_repeat('b', 60) . '.' . str_repeat('c', 30)],
+        'email bukan teks' => ['email' => 123],
+        'password terlalu pendek' => ['password' => '1234567'],
+        'password lebih dari 72 byte' => ['password' => str_repeat('a', 73)],
+        'password multibyte lebih dari 72 byte' => ['password' => str_repeat('界', 25)],
+        'password mengandung null' => ['password' => "password\0aman"],
+        'password bukan teks' => ['password' => ['password123']],
+    ];
+    foreach ($invalidInputs as $description => $overrides) {
+        $body = json_encode(array_replace($registration, $overrides), JSON_THROW_ON_ERROR);
+        expectError(request($baseUrl, '/auth?action=register', 'POST', $body), 422, 'Registrasi menolak ' . $description . '.');
+    }
+    foreach (['name', 'email', 'password'] as $field) {
+        $input = $registration;
+        unset($input[$field]);
+        expectError(request($baseUrl, '/auth?action=register', 'POST', json_encode($input, JSON_THROW_ON_ERROR)), 422, 'Field wajib diperiksa: ' . $field);
+    }
+    $stmt = $testPdo->prepare('SELECT COUNT(*) FROM users WHERE email = ?');
+    $stmt->execute([$testEmails[0]]);
+    expect((int) $stmt->fetchColumn() === 0, 'Input registrasi tidak valid tidak membuat akun.');
+
+    $seed = request($baseUrl, '/seed-session');
+    $oldCookie = sessionCookie($seed);
+    $registration['role'] = 'admin';
+    $registration['id'] = 1;
+    $response = request($baseUrl, '/auth?action=register', 'POST', json_encode($registration, JSON_THROW_ON_ERROR), 'application/json', $oldCookie);
+    expect($response['status'] === 201 && isset($response['body']['user']), 'Registrasi valid menghasilkan user dan status 201.');
+    $user = $response['body']['user'];
+    expect(is_int($user['id']) && $user['id'] > 0 && $user['name'] === trim($registration['name']) && $user['email'] === $testEmails[0] && $user['role'] === 'member', 'Nama/email dinormalisasi dan role dari klien tidak dipercaya.');
+    expect(array_keys($user) === ['id', 'name', 'email', 'role'], 'Respons tidak mengandung password atau hash.');
+    $cookie = sessionCookie($response);
+    expect($cookie !== $oldCookie, 'ID sesi diregenerasi saat registrasi.');
+    $cookieHeaders = implode("\n", $response['headers']);
+    expect(stripos($cookieHeaders, 'HttpOnly') !== false && stripos($cookieHeaders, 'SameSite=Lax') !== false, 'Cookie sesi menggunakan HttpOnly dan SameSite=Lax.');
+
+    $stmt = $testPdo->prepare('SELECT id, name, email, password_hash, role FROM users WHERE email = ?');
+    $stmt->execute([$testEmails[0]]);
+    $storedUser = $stmt->fetch();
+    expect($storedUser !== false && (int) $storedUser['id'] === $user['id'] && $storedUser['role'] === 'member', 'Akun tersimpan sebagai member di database.');
+    expect($storedUser['password_hash'] !== $registration['password'] && password_verify($registration['password'], $storedUser['password_hash']), 'Password di-hash dan spasi password tidak dihapus.');
+    $session = request($baseUrl, '/session', 'GET', null, 'application/json', $cookie);
+    expect($session['status'] === 200 && $session['body']['session'] === ['user_id' => $user['id']], 'Sesi login otomatis bertahan pada request berikutnya tanpa data sesi lama.');
+    $oldSession = request($baseUrl, '/session', 'GET', null, 'application/json', $oldCookie);
+    expect(!isset($oldSession['body']['session']['user_id']), 'Cookie sesi lama tidak dapat mengakses sesi login baru.');
+
+    $duplicate = request($baseUrl, '/auth?action=register', 'POST', json_encode($registration, JSON_THROW_ON_ERROR), 'application/json', $cookie);
+    expectError($duplicate, 409, 'Email duplikat ditolak dengan status 409.');
+    $stmt = $testPdo->prepare('SELECT COUNT(*) FROM users WHERE email = ?');
+    $stmt->execute([$testEmails[0]]);
+    expect((int) $stmt->fetchColumn() === 1, 'Request duplikat tidak membuat akun kedua.');
+    $cookie = sessionCookie($duplicate);
+    $session = request($baseUrl, '/session', 'GET', null, 'application/json', $cookie);
+    expect(($session['body']['session']['user_id'] ?? null) === $user['id'], 'Registrasi gagal tidak mengganti identitas pengguna aktif.');
+
+    $boundary = ['name' => str_repeat('界', 100), 'email' => $testEmails[1], 'password' => str_repeat('a', 72)];
+    $response = request($baseUrl, '/auth?action=register', 'POST', json_encode($boundary, JSON_THROW_ON_ERROR));
+    expect($response['status'] === 201 && $response['body']['user']['name'] === $boundary['name'], 'Nama Unicode 100 karakter dan password 72 byte diterima.');
+
+    echo 'Semua pengujian lulus; akun dan sesi khusus pengujian dibersihkan setelah selesai.', PHP_EOL;
 } catch (Throwable $exception) {
     fwrite(STDERR, '[GAGAL] ' . $exception->getMessage() . PHP_EOL);
     $exitCode = 1;
@@ -175,6 +278,21 @@ PHP;
     }
     if ($routerPath !== false && is_file($routerPath)) {
         unlink($routerPath);
+    }
+    if ($testPdo instanceof PDO) {
+        try {
+            $stmt = $testPdo->prepare('DELETE FROM users WHERE email IN (?, ?)');
+            $stmt->execute($testEmails);
+        } catch (Throwable $exception) {
+            fwrite(STDERR, '[GAGAL] Pembersihan akun uji: ' . $exception->getMessage() . PHP_EOL);
+            $exitCode = 1;
+        }
+    }
+    if ($sessionDirectory !== null && is_dir($sessionDirectory)) {
+        foreach (glob($sessionDirectory . '/sess_*') ?: [] as $sessionFile) {
+            unlink($sessionFile);
+        }
+        rmdir($sessionDirectory);
     }
 }
 

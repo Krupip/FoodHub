@@ -8,6 +8,7 @@ error_reporting(E_ALL);
 
 require_once __DIR__ . '/response.php';
 require_once __DIR__ . '/validation.php';
+require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/../config/database.php';
 
 set_exception_handler(static function (Throwable $exception): void {
