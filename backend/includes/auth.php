@@ -210,3 +210,36 @@ function getAuthenticatedUser(): ?array
     $_SESSION = [];
     return restoreRememberedUser();
 }
+
+function discardAnonymousSession(): void
+{
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        destroyUserSession();
+    }
+    // Jangan biarkan request anonim menimpa cookie dari pemulihan/login tab lain.
+    header_remove('Set-Cookie');
+}
+
+function requireLogin(): array
+{
+    $user = getAuthenticatedUser();
+
+    if ($user === null) {
+        discardAnonymousSession();
+        sendErrorResponse('Silakan masuk terlebih dahulu.', 401);
+    }
+
+    publishCsrfToken();
+    return $user;
+}
+
+function requireAdmin(): array
+{
+    $user = requireLogin();
+
+    if ($user['role'] !== 'admin') {
+        sendErrorResponse('Akses hanya diizinkan untuk admin.', 403);
+    }
+
+    return $user;
+}

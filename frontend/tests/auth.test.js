@@ -11,16 +11,22 @@ const bootstrap = '  init();\n})();';
 assert.ok(source.includes(bootstrap), 'Bootstrap main.js harus dikenali oleh harness');
 // Expose internals only inside the VM; production has no test hooks.
 const testSource = source.replace(bootstrap, `  globalThis.authTest = {
-    init, initAuth, PG, users, get user() { return U; }
+    api, logout, init, initAuth, PG, users, get user() { return U; }
   };
 })();`);
 
 const MEMBER = { id: 41, name: 'Member API', email: 'admin@foodhub.id', role: 'member' };
 const ADMIN = { id: 42, name: 'Admin API', email: 'admin@foodhub.id', role: 'admin' };
 const LOCAL_USERS = [{ name: 'Admin Lokal', email: 'admin@foodhub.id', role: 'admin', pass: 'admin123', fav: [7], at: '2026-01-01' }];
+const CSRF_A = '0123456789abcdef'.repeat(4);
+const CSRF_B = 'fedcba9876543210'.repeat(4);
 
-function response(data, status = 200) {
-  return { ok: status >= 200 && status < 300, status, json: async () => data };
+// Auth sukses beridentitas selalu membawa token di header, bukan JSON user.
+function response(data, status = 200, token = data && data.user ? CSRF_A : null) {
+  return {
+    ok: status >= 200 && status < 300, status, json: async () => data,
+    headers: { get: name => name.toLowerCase() === 'x-csrf-token' ? token : null }
+  };
 }
 function invalidJSON() {
   return { ok: true, status: 200, json: async () => { throw new SyntaxError('Invalid JSON'); } };
@@ -320,6 +326,7 @@ test('logout nav/sidebar menunggu API, mencegah klik ganda, lalu mencabut identi
       const request = h.requests[1];
       assert.equal(request.method, 'POST');
       assert.equal(request.headers['Content-Type'], 'application/json');
+      assert.equal(request.headers['X-CSRF-Token'], CSRF_A);
       assert.equal(request.credentials, 'same-origin');
       assert.equal(request.body, undefined);
       assert.equal(request.url, (adminLayout ? '../../' : '../') + 'backend/api/auth.php?action=logout');
@@ -497,4 +504,370 @@ test('seed pengguna demo baru tidak berisi password', () => {
   assert.equal(users.length, 3);
   assert.ok(users.every(user => !Object.hasOwn(user, 'pass')));
   assert.equal(h.app.user, null);
+});
+
+const invalidTokens = [
+  ['hilang', null], ['kosong', ''], ['uppercase', 'A'.repeat(64)],
+  ['non-hex', 'g'.repeat(64)], ['pendek', 'a'.repeat(63)], ['panjang', 'a'.repeat(65)],
+  ['spasi awal', ' ' + CSRF_A], ['spasi akhir', CSRF_A + ' '],
+  ['newline akhir', CSRF_A + '\n'], ['bukan string', 123]
+];
+
+test('CSRF disertakan pada mutasi protected, termasuk semua guarded stubs 501', async t => {
+  for (const [endpoint, method, user] of [
+    ['profile.php', 'POST', MEMBER], ['favorites.php', 'POST', MEMBER],
+    ['favorites.php?recipe_id=7', 'DELETE', MEMBER], ['reviews.php', 'POST', MEMBER],
+    ['admin/recipes.php', 'POST', ADMIN], ['admin/recipes.php?id=7', 'PUT', ADMIN],
+    ['admin/recipes.php?id=7', 'PATCH', ADMIN], ['admin/recipes.php?id=7', 'DELETE', ADMIN],
+    ['admin/users.php?id=7', 'DELETE', ADMIN]
+  ]) {
+    await t.test(method + ' ' + endpoint, async () => {
+      const h = harness({ fetch: () => response({ user }) });
+      await h.app.initAuth();
+      const data = { error: 'Belum diimplementasikan.' };
+      h.setFetch(() => response(data, 501, CSRF_A));
+      await assert.rejects(h.app.api(endpoint, {
+        method, body: { name: 'Baru' }, headers: { 'X-Feature': 'tetap' }
+      }), err => err.status === 501 && err.data === data && /Belum diimplementasikan/.test(err.message));
+      assert.equal(h.requests.length, 2, 'Tidak ada refresh/retry saat cache tersedia');
+      const request = h.requests[1];
+      assert.equal(request.headers['X-CSRF-Token'], CSRF_A);
+      assert.equal(request.headers['Content-Type'], 'application/json');
+      assert.equal(request.headers['X-Feature'], 'tetap');
+      assert.equal(request.credentials, 'same-origin');
+      assert.equal(request.body, '{"name":"Baru"}');
+      assert.equal(h.app.user, user);
+      assertNoLocalAuth(h);
+    });
+  }
+});
+
+test('GET/HEAD/OPTIONS tidak mengirim CSRF dan tidak melakukan preflight me', async t => {
+  for (const cached of [false, true]) {
+    for (const method of ['GET', 'HEAD', 'OPTIONS']) {
+      await t.test(method + ' cache=' + cached, async () => {
+        const h = harness({ fetch: () => response({ user: cached ? MEMBER : null }) });
+        await h.app.initAuth();
+        const result = response({ recipes: [] });
+        // Mock fetch lama tanpa Response.headers tetap didukung untuk respons non-auth.
+        delete result.headers;
+        h.setFetch(() => result);
+        await h.app.api('favorites.php', { method, headers: { 'x-csrf-token': 'caller-token' } });
+        assert.equal(h.requests.length, 2);
+        assert.equal(h.requests[1].headers['X-CSRF-Token'], undefined);
+        assert.equal(h.requests[1].headers['x-csrf-token'], undefined);
+        assertNoLocalAuth(h);
+      });
+    }
+  }
+});
+
+test('cache kosong memulihkan sesi lewat satu GET me sebelum mutasi tanpa rekursi', async t => {
+  for (const user of [MEMBER, ADMIN]) {
+    await t.test(user.role, async () => {
+      const h = harness();
+      await h.app.initAuth();
+      h.setFetch(action => action === 'me'
+        ? response({ user }, 200, CSRF_B) : response({ message: 'ok' }));
+      await h.app.api('profile.php', { method: 'post', body: { name: 'Baru' } });
+      assert.equal(h.requests.length, 3);
+      assert.match(h.requests[1].url, /auth\.php\?action=me$/);
+      assert.equal(h.requests[1].method, 'GET');
+      assert.equal(h.requests[1].headers['X-CSRF-Token'], undefined);
+      assert.equal(h.requests[1].credentials, 'same-origin');
+      assert.equal(h.requests[2].method, 'POST');
+      assert.equal(h.requests[2].headers['X-CSRF-Token'], CSRF_B);
+      assert.equal(h.app.user, user);
+      assertNoLocalAuth(h);
+    });
+  }
+});
+
+test('refresh anon meneruskan request asli untuk 401 atau logout idempotent 200 tanpa token', async t => {
+  for (const logout of [false, true]) {
+    await t.test(logout ? 'logout anon' : 'mutasi anon', async () => {
+      const h = harness();
+      await h.app.initAuth();
+      h.setFetch(action => action === 'me'
+        ? response({ user: null }, 200, CSRF_B)
+        : logout ? response({ message: 'Berhasil keluar.' }) : response({ error: 'Harus masuk.' }, 401));
+      const request = h.app.api(logout ? 'auth.php?action=logout' : 'profile.php', { method: 'POST' });
+      if (logout) await request; else await assert.rejects(request, err => err.status === 401);
+      assert.equal(h.requests.length, 3);
+      assert.match(h.requests[1].url, /action=me$/);
+      assert.equal(h.requests[2].headers['X-CSRF-Token'], undefined, 'Token dari me anon diabaikan');
+      assert.equal(h.app.user, null);
+      assertNoLocalAuth(h);
+    });
+  }
+});
+
+test('public POST login/register tidak membutuhkan CSRF atau refresh me', async t => {
+  for (const action of ['login', 'register']) {
+    await t.test(action, async () => {
+      const payload = { user: MEMBER };
+      const h = harness({ fetch: () => response(payload, action === 'register' ? 201 : 200, CSRF_B) });
+      assert.equal(await h.app.api('auth.php?action=' + action, { method: 'POST', body: { email: MEMBER.email } }), payload);
+      assert.equal(h.requests.length, 1);
+      assert.equal(h.requests[0].headers['X-CSRF-Token'], undefined);
+      assert.equal(payload.user, MEMBER);
+      assert.deepEqual(Object.keys(payload.user), ['id', 'name', 'email', 'role']);
+      h.setFetch(() => response({ message: 'ok' }));
+      await h.app.api('profile.php', { method: 'POST' });
+      assert.equal(h.requests.length, 2);
+      assert.equal(h.requests[1].headers['X-CSRF-Token'], CSRF_B);
+    });
+  }
+});
+
+test('login/register mengganti cache sesi lama, termasuk login ulang identitas sama', async t => {
+  for (const action of ['login', 'register']) {
+    for (const user of [MEMBER, ADMIN]) {
+      await t.test(action + ' ' + (user === MEMBER ? 'akun sama' : 'akun berganti'), async () => {
+        const h = harness({ fetch: () => response({ user: MEMBER }) });
+        await h.app.initAuth();
+        h.setFetch(() => response({ user }, action === 'register' ? 201 : 200, CSRF_B));
+        await h.app.api('auth.php?action=' + action, { method: 'POST' });
+        assert.equal(h.requests[1].headers['X-CSRF-Token'], CSRF_A);
+        h.setFetch(() => response({ message: 'ok' }));
+        await h.app.api('profile.php', { method: 'POST' });
+        assert.equal(h.requests.length, 3);
+        assert.equal(h.requests[2].headers['X-CSRF-Token'], CSRF_B);
+        assert.equal(h.app.user, user);
+        assertNoLocalAuth(h);
+      });
+    }
+  }
+});
+
+test('me merotasi cache saat restore, lalu me anon membuang token identitas sebelumnya', async () => {
+  const h = harness({ fetch: () => response({ user: ADMIN }) });
+  await h.app.initAuth();
+  h.setFetch(() => response({ user: MEMBER }, 200, CSRF_B));
+  await h.app.api('auth.php?action=me');
+  h.setFetch(() => response({ message: 'ok' }));
+  await h.app.api('profile.php', { method: 'POST' });
+  assert.equal(h.requests[2].headers['X-CSRF-Token'], CSRF_B);
+  assert.equal(h.app.user, MEMBER);
+  h.setFetch(() => response({ user: null }, 200, CSRF_A));
+  await h.app.api('auth.php?action=me');
+  h.setFetch(action => action === 'me' ? response({ user: null }) : response({ message: 'Berhasil keluar.' }));
+  await h.app.api('auth.php?action=logout', { method: 'POST' });
+  assert.equal(h.requests.length, 6);
+  assert.match(h.requests[4].url, /action=me$/);
+  assert.equal(h.requests[5].headers['X-CSRF-Token'], undefined);
+  assert.equal(h.app.user, null);
+  assertNoLocalAuth(h);
+});
+
+test('me authenticated dengan token hilang/rusak fail closed dan notifikasi jelas', async t => {
+  for (const [name, token] of invalidTokens) {
+    await t.test(name, async () => {
+      const h = harness({ access: 'member', fetch: () => response({ user: MEMBER }, 200, token) });
+      assert.equal(await h.app.initAuth(), false);
+      assert.equal(h.app.user, null);
+      assert.equal(h.get('main').hidden, true);
+      assert.match(h.get('toast').textContent, /Token CSRF server hilang atau tidak valid/);
+      assert.match(h.location.replacements[0], /auth=unavailable/);
+      assertNoLocalAuth(h);
+    });
+  }
+});
+
+test('refresh authenticated tanpa token valid menghentikan mutasi dan membuang cache lama', async t => {
+  for (const [name, token] of invalidTokens) {
+    await t.test(name, async () => {
+      const h = harness({ fetch: () => response({ user: ADMIN }) });
+      await h.app.initAuth();
+      h.setFetch(() => response({ user: MEMBER }, 200, token));
+      await assert.rejects(h.app.api('auth.php?action=me'), /Token CSRF/);
+      await assert.rejects(h.app.api('profile.php', { method: 'POST' }), /Token CSRF/);
+      assert.equal(h.requests.length, 3);
+      assert.ok(h.requests.every(request => request.method === 'GET'), 'Mutasi tidak pernah dikirim');
+      assert.equal(h.app.user, null);
+      assertNoLocalAuth(h);
+    });
+  }
+});
+
+test('login/registrasi tanpa token valid tidak menganggap autentikasi sukses', async t => {
+  for (const page of ['masuk', 'daftar']) {
+    for (const [name, token] of invalidTokens.slice(0, 3)) {
+      await t.test(page + ' ' + name, async () => {
+        const h = harness({ page });
+        await h.app.initAuth();
+        h.app.PG[page]();
+        if (page === 'masuk') fillLogin(h); else fillRegister(h);
+        h.setFetch(() => response({ user: MEMBER }, page === 'daftar' ? 201 : 200, token));
+        await h.get(page === 'masuk' ? 'lf' : 'df').emit('submit');
+        assert.equal(h.requests.length, 2);
+        assert.equal(h.app.user, null);
+        assert.equal(h.location.href, '');
+        assert.equal(h.get('er').hidden, false);
+        assert.match(h.get('er').textContent + h.get('er').innerHTML, /Token CSRF/);
+        assert.equal(h.get('toast'), null);
+        assertNoLocalAuth(h);
+      });
+    }
+  }
+});
+
+test('mock headers tidak tersedia tidak TypeError, tetapi auth tetap wajib token header', async t => {
+  for (const headers of [undefined, {}, { get: () => undefined }]) {
+    await t.test(String(headers && typeof headers.get), async () => {
+      const reply = response({ user: MEMBER });
+      reply.headers = headers;
+      const h = harness({ fetch: () => reply });
+      await assert.rejects(h.app.api('auth.php?action=me'), /Token CSRF server/);
+      assert.equal(h.app.user, null);
+      assert.equal(h.requests.length, 1);
+    });
+  }
+});
+
+test('token dalam body tidak dipakai sebagai pengganti header server', async () => {
+  const h = harness({ fetch: () => response({ user: { ...MEMBER, csrf_token: CSRF_A }, csrfToken: CSRF_A }, 200, null) });
+  await assert.rejects(h.app.api('auth.php?action=me'), /Token CSRF/);
+  assert.equal(h.app.user, null);
+});
+
+test('refresh me gagal tidak mengirim mutasi asli atau membuat loop', async t => {
+  for (const [name, reply] of [...requestFailures, ...brokenResponses]) {
+    await t.test(name, async () => {
+      const h = harness();
+      await h.app.initAuth();
+      h.setFetch(reply);
+      await assert.rejects(h.app.api('reviews.php', { method: 'POST', body: { rating: 5 } }));
+      assert.equal(h.requests.length, 2);
+      assert.match(h.requests[1].url, /action=me$/);
+      assert.equal(h.requests[1].method, 'GET');
+      assert.equal(h.app.user, null);
+      assertNoLocalAuth(h);
+    });
+  }
+});
+
+test('403 tidak mengulang mutasi, token respons dipakai hanya pada retry manual', async () => {
+  const h = harness({ fetch: () => response({ user: MEMBER }) });
+  await h.app.initAuth();
+  const error = { error: 'Token CSRF tidak cocok.' };
+  h.setFetch(() => response(error, 403, CSRF_B));
+  await assert.rejects(h.app.api('favorites.php', { method: 'POST', body: { recipe_id: 7 } }), err => err.status === 403 && err.data === error);
+  assert.equal(h.requests.length, 2, 'Tidak ada GET me atau pengulangan POST otomatis');
+  assert.equal(h.requests[1].headers['X-CSRF-Token'], CSRF_A);
+  assert.equal(h.app.user, MEMBER);
+  h.setFetch(() => response({ message: 'ok' }));
+  await h.app.api('favorites.php', { method: 'POST', body: { recipe_id: 7 } });
+  assert.equal(h.requests.length, 3);
+  assert.equal(h.requests[2].headers['X-CSRF-Token'], CSRF_B);
+  assertNoLocalAuth(h);
+});
+
+test('header 403 tidak valid tidak menggantikan token valid di cache', async t => {
+  for (const [name, token] of invalidTokens) {
+    await t.test(name, async () => {
+      const h = harness({ fetch: () => response({ user: MEMBER }) });
+      await h.app.initAuth();
+      h.setFetch(() => response({ error: 'Ditolak.' }, 403, token));
+      await assert.rejects(h.app.api('profile.php', { method: 'POST' }), err => err.status === 403);
+      h.setFetch(() => response({ message: 'ok' }));
+      await h.app.api('profile.php', { method: 'POST' });
+      assert.equal(h.requests.length, 3);
+      assert.equal(h.requests[2].headers['X-CSRF-Token'], CSRF_A);
+      assertNoLocalAuth(h);
+    });
+  }
+});
+
+test('logout 403 mempertahankan sesi dan UI, retry manual memakai token baru lalu membersihkan cache', async () => {
+  const h = harness({ fetch: () => response({ user: MEMBER }) });
+  await h.app.initAuth();
+  const button = h.get('lo');
+  h.setFetch(() => response({ error: 'Token CSRF tidak cocok.' }, 403, CSRF_B));
+  await button.emit('click');
+  assert.equal(h.requests.length, 2);
+  assert.equal(h.app.user, MEMBER);
+  assert.equal(h.location.href, '');
+  assert.equal(button.disabled, false);
+  assert.match(h.get('toast').textContent, /Gagal keluar.*CSRF/);
+  h.setFetch(() => response({ message: 'Berhasil keluar.' }, 200, CSRF_A));
+  await button.emit('click');
+  assert.equal(h.requests.length, 3);
+  assert.equal(h.requests[2].headers['X-CSRF-Token'], CSRF_B);
+  assert.equal(h.app.user, null);
+  assert.equal(h.location.href, 'index.html');
+  h.setFetch(action => action === 'me' ? response({ user: null }) : response({ message: 'Berhasil keluar.' }));
+  await h.app.logout();
+  assert.equal(h.requests.length, 5);
+  assert.match(h.requests[3].url, /action=me$/);
+  assert.equal(h.requests[4].headers['X-CSRF-Token'], undefined);
+  assertNoLocalAuth(h);
+});
+
+test('401 protected membuang identitas/token, sedangkan login gagal tidak mengganti sesi lama', async () => {
+  const h = harness({ fetch: () => response({ user: MEMBER }) });
+  await h.app.initAuth();
+  h.setFetch(() => response({ error: 'Kredensial salah.' }, 401));
+  await assert.rejects(h.app.api('auth.php?action=login', { method: 'POST' }), err => err.status === 401);
+  assert.equal(h.app.user, MEMBER);
+  h.setFetch(() => response({ error: 'Sesi kedaluwarsa.' }, 401, CSRF_B));
+  await assert.rejects(h.app.api('profile.php', { method: 'POST' }), err => err.status === 401);
+  assert.equal(h.requests[2].headers['X-CSRF-Token'], CSRF_A);
+  assert.equal(h.app.user, null);
+  h.setFetch(action => action === 'me' ? response({ user: null }) : response({ message: 'Berhasil keluar.' }));
+  await h.app.api('auth.php?action=logout', { method: 'POST' });
+  assert.equal(h.requests.length, 5);
+  assert.match(h.requests[3].url, /action=me$/);
+  assert.equal(h.requests[4].headers['X-CSRF-Token'], undefined);
+  assertNoLocalAuth(h);
+});
+
+test('token dari guarded GET 501 di-cache, tetapi tidak disertakan pada GET', async () => {
+  const h = harness({ fetch: () => response({ user: ADMIN }) });
+  await h.app.initAuth();
+  h.setFetch(() => response({ error: 'Belum diimplementasikan.' }, 501, CSRF_B));
+  await assert.rejects(h.app.api('admin/stats.php'), err => err.status === 501);
+  assert.equal(h.requests[1].headers['X-CSRF-Token'], undefined);
+  h.setFetch(() => response({ message: 'ok' }));
+  await h.app.api('admin/recipes.php?id=7', { method: 'PATCH' });
+  assert.equal(h.requests.length, 3);
+  assert.equal(h.requests[2].headers['X-CSRF-Token'], CSRF_B);
+});
+
+test('fitur edit profil menampilkan 501 tanpa klaim sukses atau perubahan identitas', async () => {
+  const h = harness({ page: 'profil', access: 'member', fetch: () => response({ user: MEMBER }) });
+  await h.app.initAuth();
+  h.setFetch(() => response({ error: 'Belum diimplementasikan.' }, 501, CSRF_A));
+  await h.app.PG.profil();
+  h.get('nn').value = 'Nama Baru';
+  await h.get('nf').emit('submit');
+  assert.equal(h.requests.length, 4);
+  assert.equal(h.requests[3].method, 'POST');
+  assert.equal(h.requests[3].headers['X-CSRF-Token'], CSRF_A);
+  assert.equal(h.get('no').hidden, true);
+  assert.equal(h.get('ne').hidden, false);
+  assert.match(h.get('ne').textContent, /Belum diimplementasikan/);
+  assert.equal(h.app.user, MEMBER);
+  assertNoLocalAuth(h);
+});
+
+test('cache hanya di memori, tidak tersimpan atau dipulihkan pada VM/halaman baru', async () => {
+  const h = harness({ fetch: () => response({ user: MEMBER }) });
+  await h.app.initAuth();
+  const opts = { method: 'POST', body: { name: 'Baru' }, headers: { 'x-csrf-token': 'caller-token' } };
+  h.setFetch(() => response({ message: 'ok' }));
+  await h.app.api('profile.php', opts);
+  assert.equal(h.requests[1].headers['X-CSRF-Token'], CSRF_A);
+  assert.equal(h.requests[1].headers['x-csrf-token'], undefined);
+  assert.equal(opts.headers['x-csrf-token'], 'caller-token', 'Options caller tidak dimutasi');
+  assert.deepEqual(opts.body, { name: 'Baru' });
+  assertNoLocalAuth(h);
+  const fresh = harness();
+  await fresh.app.initAuth();
+  fresh.setFetch(action => action === 'me' ? response({ user: null }) : response({ message: 'Berhasil keluar.' }));
+  await fresh.app.api('auth.php?action=logout', { method: 'POST' });
+  assert.equal(fresh.requests.length, 3);
+  assert.match(fresh.requests[1].url, /action=me$/);
+  assert.equal(fresh.requests[2].headers['X-CSRF-Token'], undefined);
+  assertNoLocalAuth(fresh);
 });

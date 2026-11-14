@@ -14,12 +14,9 @@ if ($action === 'me') {
     requireRequestMethod('GET');
     $user = getAuthenticatedUser();
     if ($user === null) {
-        if (session_status() === PHP_SESSION_ACTIVE) {
-            destroyUserSession();
-        }
-        // Respons pemeriksaan yang kalah balapan tidak boleh menimpa cookie login baru.
-        header_remove('Set-Cookie');
-    } elseif (session_status() === PHP_SESSION_ACTIVE) {
+        discardAnonymousSession();
+    } else {
+        publishCsrfToken();
         session_write_close();
     }
     sendJsonResponse(['user' => $user]);
@@ -29,6 +26,11 @@ if ($action === 'logout') {
     requireRequestMethod('POST');
     // Tidak menerima form lintas situs; frontend memakai JSON tanpa membutuhkan body.
     requireJsonContentType();
+    $user = getAuthenticatedUser();
+    if ($user !== null) {
+        publishCsrfToken();
+        requireCsrfToken();
+    }
     startUserSession();
     forgetRememberedLogin();
     destroyUserSession();
@@ -99,6 +101,7 @@ if ($action === 'login') {
 
     $user['id'] = (int) $user['id'];
     establishUserSession($user['id'], $input['remember'] ?? false);
+    publishCsrfToken();
     session_write_close();
 
     unset($user['password_hash']);
@@ -130,6 +133,7 @@ try {
 $userId = (int) $pdo->lastInsertId();
 forgetRememberedLogin();
 $_SESSION = ['user_id' => $userId];
+publishCsrfToken();
 session_write_close();
 
 sendJsonResponse([

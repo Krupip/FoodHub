@@ -51,20 +51,63 @@
      ========================================================================== */
   const API_BASE = (R ? (R + '../') : '../') + 'backend/api/';
 
-  async function api(path, opts = {}) {
-    opts.credentials = 'same-origin';
-    opts.headers = Object.assign({
-      'Content-Type': 'application/json'
-    }, opts.headers || {});
+  let csrfToken = null;
+  const CSRF_INVALID = 'Token CSRF server hilang atau tidak valid. Muat ulang halaman atau masuk kembali sebelum mencoba lagi.';
+  const safeMethod = method => ['GET', 'HEAD', 'OPTIONS'].includes(method);
+  const authAction = path => path.split('?')[0] === 'auth.php'
+    ? new URLSearchParams(path.split('?')[1] || '').get('action') : null;
 
-    if (opts.body && typeof opts.body === 'object' && !(opts.body instanceof FormData)) {
-      opts.body = JSON.stringify(opts.body);
+  // Refresh memakai fetch helper langsung, bukan api(), agar tidak merekursi mutasi.
+  async function api(path, opts = {}) {
+    const method = (opts.method || 'GET').toUpperCase();
+    const publicAuth = method === 'POST' && ['login', 'register'].includes(authAction(path));
+    if (!safeMethod(method) && !publicAuth && !csrfToken) {
+      await fetchApi('auth.php?action=me');
+    }
+    return fetchApi(path, opts);
+  }
+
+  async function fetchApi(path, opts = {}) {
+    const method = (opts.method || 'GET').toUpperCase();
+    const action = authAction(path);
+    const publicAuth = method === 'POST' && ['login', 'register'].includes(action);
+    const headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+    // Token hanya berasal dari header server dan tidak pernah dikirim pada safe methods.
+    Object.keys(headers).forEach(key => {
+      if (key.toLowerCase() === 'x-csrf-token') delete headers[key];
+    });
+    if (!safeMethod(method) && csrfToken) headers['X-CSRF-Token'] = csrfToken;
+    let body = opts.body;
+    if (body && typeof body === 'object' && !(body instanceof FormData)) {
+      body = JSON.stringify(body);
     }
 
-    const res = await fetch(API_BASE + path, opts);
+    const res = await fetch(API_BASE + path, { ...opts, method, credentials: 'same-origin', headers, body });
+    const header = res.headers && typeof res.headers.get === 'function' ? res.headers.get('X-CSRF-Token') : null;
+    const token = typeof header === 'string' && header.length === 64 && /^[0-9a-f]{64}$/.test(header) ? header : null;
     const data = await res.json().catch(() => ({}));
+    if (res.ok && (method === 'GET' && action === 'me' || publicAuth)) {
+      // Jangan mempertahankan token identitas lama, termasuk login ulang akun yang sama.
+      csrfToken = null;
+      U = null;
+      const user = authUser(data, action === 'me');
+      if (user && !token) throw new Error(CSRF_INVALID);
+      U = user;
+      csrfToken = user ? token : null;
+    } else if (res.ok && method === 'POST' && action === 'logout') {
+      const result = authResponse(data);
+      if (typeof result.message !== 'string' || !result.message.trim()) throw new Error(AUTH_INVALID);
+      U = null;
+      csrfToken = null;
+    } else if (res.status === 401 && !publicAuth) {
+      U = null;
+      csrfToken = null;
+    } else if (token) {
+      // Termasuk 403/501: simpan token baru, tetapi jangan ulangi mutasi otomatis.
+      csrfToken = token;
+    }
     if (!res.ok) {
-      const err = new Error(data.error || 'Terjadi kesalahan sistem.');
+      const err = new Error(data && data.error || 'Terjadi kesalahan sistem.');
       err.status = res.status;
       err.data = data;
       throw err;
@@ -860,6 +903,7 @@
     const protectedContent = ACC ? $$('main, #nav, #side, #top, #foot').map(el => ({ el, hidden: el.hidden })) : [];
     protectedContent.forEach(({ el }) => { el.hidden = true; });
     U = null;
+    csrfToken = null;
     clearLegacyAuth();
     let unavailable = false;
     try {
@@ -867,7 +911,7 @@
     } catch (e) {
       U = null;
       unavailable = true;
-      toast(AUTH_UNAVAILABLE);
+      toast(AUTH_UNAVAILABLE + (e.message === CSRF_INVALID ? ' ' + CSRF_INVALID : ''));
     }
     // Teruskan notifikasi setelah redirect tanpa menyimpan identitas di browser.
     const notice = unavailable ? '&auth=unavailable' : '';
