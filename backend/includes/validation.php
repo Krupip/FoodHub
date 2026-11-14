@@ -12,14 +12,18 @@ function requireRequestMethod(string $allowedMethod): void
     }
 }
 
-function readJsonBody(): array
+function requireJsonContentType(): void
 {
     $contentType = strtolower(trim(explode(';', $_SERVER['CONTENT_TYPE'] ?? '')[0]));
 
     if ($contentType !== 'application/json') {
         sendErrorResponse('Content-Type harus application/json.', 415);
     }
+}
 
+function readJsonBody(): array
+{
+    requireJsonContentType();
     $body = file_get_contents('php://input');
 
     if ($body === false || trim($body) === '') {

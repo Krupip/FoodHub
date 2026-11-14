@@ -6,8 +6,33 @@ require_once __DIR__ . '/../includes/bootstrap.php';
 
 $action = $_GET['action'] ?? '';
 
-if (!in_array($action, ['register', 'login'], true)) {
+if (!in_array($action, ['register', 'login', 'me', 'logout'], true)) {
     sendErrorResponse('Aksi autentikasi tidak ditemukan.', 404);
+}
+
+if ($action === 'me') {
+    requireRequestMethod('GET');
+    $user = getAuthenticatedUser();
+    if ($user === null) {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            destroyUserSession();
+        }
+        // Respons pemeriksaan yang kalah balapan tidak boleh menimpa cookie login baru.
+        header_remove('Set-Cookie');
+    } elseif (session_status() === PHP_SESSION_ACTIVE) {
+        session_write_close();
+    }
+    sendJsonResponse(['user' => $user]);
+}
+
+if ($action === 'logout') {
+    requireRequestMethod('POST');
+    // Tidak menerima form lintas situs; frontend memakai JSON tanpa membutuhkan body.
+    requireJsonContentType();
+    startUserSession();
+    forgetRememberedLogin();
+    destroyUserSession();
+    sendJsonResponse(['message' => 'Berhasil keluar.']);
 }
 
 requireRequestMethod('POST');
@@ -72,13 +97,8 @@ if ($action === 'login') {
         sendErrorResponse('Email atau kata sandi salah.', 401);
     }
 
-    startUserSession();
-    if (!session_regenerate_id(true)) {
-        throw new RuntimeException('Tidak dapat memperbarui sesi pengguna.');
-    }
-
     $user['id'] = (int) $user['id'];
-    $_SESSION = ['user_id' => $user['id']];
+    establishUserSession($user['id'], $input['remember'] ?? false);
     session_write_close();
 
     unset($user['password_hash']);
@@ -108,6 +128,7 @@ try {
 }
 
 $userId = (int) $pdo->lastInsertId();
+forgetRememberedLogin();
 $_SESSION = ['user_id' => $userId];
 session_write_close();
 

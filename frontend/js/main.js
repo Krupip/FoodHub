@@ -1,7 +1,7 @@
 /* ==========================================================================
    FoodHub - main.js
    Frontend terhubung ke backend API PHP (MySQL/MariaDB).
-   Endpoint sesuai backend/README.md dengan fallback data lokal saat offline.
+   Autentikasi hanya melalui API; fitur lain masih dapat memakai data lokal.
    ========================================================================== */
 
 (function () {
@@ -590,44 +590,93 @@
     return { a: s / n, n };
   };
 
-  /* Sesi Lokal */
-  const sess = () => {
-    try {
-      const v = sessionStorage.getItem('fh_s') || localStorage.getItem('fh_s');
-      return v ? JSON.parse(v) : null;
-    } catch (e) { return null; }
-  };
-  const setSess = (u, keep) => {
-    try {
-      sessionStorage.removeItem('fh_s');
-      localStorage.removeItem('fh_s');
-      (keep ? localStorage : sessionStorage).setItem('fh_s', JSON.stringify({ email: u.email }));
-    } catch (e) {}
-  };
-  const endSess = () => {
-    try {
-      sessionStorage.removeItem('fh_s');
-      localStorage.removeItem('fh_s');
-    } catch (e) {}
+  /* Migrasi identitas lokal lama; sesi kini hanya dikelola server. */
+  const clearLegacyAuth = () => {
+    try { sessionStorage.removeItem('fh_s'); } catch (e) {}
+    try { localStorage.removeItem('fh_s'); } catch (e) {}
   };
   const users = () => {
     let u = ld('fh_users', null);
     if (!u) {
       u = [
-        { name: 'Admin FoodHub', email: 'admin@foodhub.id', pass: 'admin123', role: 'admin', fav: [], at: '2026-08-01' },
-        { name: 'Raka Pratama', email: 'raka@contoh.id', pass: 'rahasia123', role: 'member', fav: [1, 2], at: '2026-09-12' },
-        { name: 'Nadia Putri', email: 'nadia@contoh.id', pass: 'rahasia123', role: 'member', fav: [3], at: '2026-10-03' }
+        { name: 'Admin FoodHub', email: 'admin@foodhub.id', role: 'admin', fav: [], at: '2026-08-01' },
+        { name: 'Raka Pratama', email: 'raka@contoh.id', role: 'member', fav: [1, 2], at: '2026-09-12' },
+        { name: 'Nadia Putri', email: 'nadia@contoh.id', role: 'member', fav: [3], at: '2026-10-03' }
       ];
+      sv('fh_users', u);
+    }
+    // Hapus hanya password demo lama, tanpa membuang akun atau data fitur lokal.
+    if (Array.isArray(u) && u.some(x => Object.prototype.hasOwnProperty.call(x, 'pass'))) {
+      u = u.map(x => {
+        const user = { ...x };
+        delete user.pass;
+        return user;
+      });
       sv('fh_users', u);
     }
     return u;
   };
-  const me = () => {
-    const s = sess();
-    return s ? (users().find(x => x.email === s.email) || null) : null;
-  };
 
   let U = null;
+  const AUTH_INVALID = 'Respons autentikasi server tidak valid. Silakan coba lagi.';
+  const AUTH_UNAVAILABLE = 'Tidak dapat memeriksa sesi. Pastikan backend tersedia, lalu coba masuk lagi.';
+
+  function authResponse(data) {
+    if (!data || typeof data !== 'object' || Array.isArray(data) || 'error' in data) {
+      throw new Error(AUTH_INVALID);
+    }
+    return data;
+  }
+
+  function authUser(data, allowGuest = false) {
+    const user = authResponse(data).user;
+    if (allowGuest && user === null) return null;
+    const validId = user && (Number.isSafeInteger(user.id) && user.id > 0 ||
+      typeof user.id === 'string' && /^[1-9]\d*$/.test(user.id));
+    if (!validId || typeof user.name !== 'string' || !user.name.trim() ||
+        typeof user.email !== 'string' || !user.email.trim() ||
+        !['member', 'admin'].includes(user.role)) {
+      throw new Error(AUTH_INVALID);
+    }
+    return user;
+  }
+
+  let loggingOut = false;
+  async function logout() {
+    if (loggingOut) return;
+    loggingOut = true;
+    const buttons = $$('#lo, #alo');
+    buttons.forEach(button => { button.disabled = true; });
+    try {
+      const res = authResponse(await api('auth.php?action=logout', { method: 'POST' }));
+      if (typeof res.message !== 'string' || !res.message.trim()) throw new Error(AUTH_INVALID);
+      U = null;
+      clearLegacyAuth();
+      location.href = R + 'index.html';
+    } catch (err) {
+      toast('Gagal keluar. ' + (err.message || 'Silakan coba lagi.'));
+    } finally {
+      loggingOut = false;
+      buttons.forEach(button => { button.disabled = false; });
+    }
+  }
+
+  function bindAuthSubmit(form, submit) {
+    let pending = false;
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      if (pending) return;
+      pending = true;
+      const buttons = $$('[type="submit"]', form);
+      buttons.forEach(button => { button.disabled = true; });
+      try {
+        await submit();
+      } finally {
+        pending = false;
+        buttons.forEach(button => { button.disabled = false; });
+      }
+    });
+  }
 
   /* ==========================================================================
      Tampilan Kartu Resep (Sesuai Foto 1: 3 kartu sebaris, foto 240px, deskripsi)
@@ -733,13 +782,7 @@
     }
 
     const lo = $('#lo');
-    if (lo) {
-      lo.addEventListener('click', async () => {
-        try { await api('auth.php?action=logout', { method: 'POST' }); } catch (e) {}
-        endSess();
-        location.href = R + 'index.html';
-      });
-    }
+    if (lo) lo.addEventListener('click', logout);
 
     buildFoot();
   }
@@ -794,11 +837,7 @@
     `;
 
     $('#sbt').addEventListener('click', () => $('#side').classList.toggle('open'));
-    $('#alo').addEventListener('click', async () => {
-      try { await api('auth.php?action=logout', { method: 'POST' }); } catch (e) {}
-      endSess();
-      location.href = R + 'index.html';
-    });
+    $('#alo').addEventListener('click', logout);
   }
 
   function buildTabs() {
@@ -818,24 +857,29 @@
      Inisialisasi Sesi & Proteksi Akses
      ========================================================================== */
   async function initAuth() {
+    const protectedContent = ACC ? $$('main, #nav, #side, #top, #foot').map(el => ({ el, hidden: el.hidden })) : [];
+    protectedContent.forEach(({ el }) => { el.hidden = true; });
+    U = null;
+    clearLegacyAuth();
+    let unavailable = false;
     try {
-      const res = await api('auth.php?action=me');
-      U = res.user || null;
-      if (U) setSess(U, true);
-      else endSess();
+      U = authUser(await api('auth.php?action=me'), true);
     } catch (e) {
-      // Offline fallback
-      U = me();
+      U = null;
+      unavailable = true;
+      toast(AUTH_UNAVAILABLE);
     }
+    // Teruskan notifikasi setelah redirect tanpa menyimpan identitas di browser.
+    const notice = unavailable ? '&auth=unavailable' : '';
 
     if (ACC === 'member' && !U) {
-      location.replace(R + 'masuk.html?next=' + encodeURIComponent(location.pathname.split('/').pop() + location.search));
+      location.replace(R + 'masuk.html?next=' + encodeURIComponent(location.pathname.split('/').pop() + location.search) + notice);
       return false;
     }
 
     if (ACC === 'admin') {
       if (!U) {
-        location.replace(R + 'masuk.html?next=' + encodeURIComponent('admin/' + location.pathname.split('/').pop()));
+        location.replace(R + 'masuk.html?next=' + encodeURIComponent('admin/' + location.pathname.split('/').pop()) + notice);
         return false;
       }
       if (U.role !== 'admin') {
@@ -846,6 +890,7 @@
 
     if ($('#nav')) buildNav();
     if ($('#side')) buildAdmin();
+    protectedContent.forEach(({ el, hidden }) => { el.hidden = hidden; });
     return true;
   }
 
@@ -1408,8 +1453,8 @@
         location.replace(U.role === 'admin' ? 'admin/dasbor.html' : 'profil.html');
         return;
       }
-      $('#lf').addEventListener('submit', async e => {
-        e.preventDefault();
+      if (qs.get('auth') === 'unavailable') bar($('#er'), AUTH_UNAVAILABLE);
+      bindAuthSubmit($('#lf'), async () => {
         const em = $('#em').value.trim().toLowerCase();
         const pw = $('#pw').value;
         const er = $('#er');
@@ -1424,8 +1469,8 @@
             method: 'POST',
             body: { email: em, password: pw, remember: $('#ing').checked }
           });
-          U = res.user;
-          setSess(U, $('#ing').checked);
+          U = authUser(res);
+          clearLegacyAuth();
           const nx = qs.get('next');
           location.href = nx && /^(admin\/)?[a-z-]+\.html(\?[\w=&%.\-]*)?$/i.test(nx)
             ? nx
@@ -1441,8 +1486,7 @@
         location.replace('profil.html');
         return;
       }
-      $('#df').addEventListener('submit', async e => {
-        e.preventDefault();
+      bindAuthSubmit($('#df'), async () => {
         const nm = $('#dn').value.trim();
         const em = $('#de').value.trim().toLowerCase();
         const pw = $('#dp').value;
@@ -1465,8 +1509,8 @@
             method: 'POST',
             body: { name: nm, email: em, password: pw }
           });
-          U = res.user;
-          setSess(U, false);
+          U = authUser(res);
+          clearLegacyAuth();
           toast('Pendaftaran berhasil!');
           location.href = 'index.html';
         } catch (err) {

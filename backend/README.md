@@ -24,6 +24,16 @@ Sesuaikan nilai pada `database.local.php` dengan pengaturan database Laragon:
 
 Nilai contoh bukan jaminan konfigurasi Laragon kamu. `database.local.php` diabaikan Git karena berisi kredensial. Jangan gunakan akun `root` tanpa password untuk produksi; gunakan akun khusus dengan izin yang diperlukan saja.
 
+### Migrasi database lama untuk Ingat saya
+
+Instalasi baru melalui `database/foodhub.sql` sudah memiliki tabel `remember_tokens`. Untuk database yang sebelumnya diimpor, jalankan migrasi tambahan dari direktori utama proyek:
+
+```sh
+php -r 'require "backend/config/database.php"; getDatabaseConnection()->exec(file_get_contents("database/migrations/001_remember_tokens.sql"));'
+```
+
+Migrasi ini hanya menambah tabel jika belum ada dan tidak menghapus data pengguna/resep. Jangan mengimpor ulang `foodhub.sql` untuk memperbarui database lama, karena file tersebut menghapus database. Migrasi dijalankan secara eksplisit, bukan otomatis ketika endpoint web dipanggil.
+
 ### 3. Menggunakan koneksi
 
 Contoh pemakaian di file langsung di dalam `backend/api/`:
@@ -81,8 +91,8 @@ File bersama yang tersedia:
 |---|---|
 | `includes/bootstrap.php` | Memuat helper dan koneksi, mengatur header keamanan/cache, serta menangani error internal |
 | `includes/response.php` | Menyediakan `sendJsonResponse()` dan `sendErrorResponse()` |
-| `includes/validation.php` | Menyediakan `requireRequestMethod()` dan `readJsonBody()` |
-| `includes/auth.php` | Menyediakan `startUserSession()` untuk memulai sesi pengguna dengan cookie aman |
+| `includes/validation.php` | Menyediakan `requireRequestMethod()`, `requireJsonContentType()`, dan `readJsonBody()` |
+| `includes/auth.php` | Mengelola sesi, identitas pengguna dari database, token Ingat saya, dan pencabutan sesi/token |
 
 Muat bootstrap di awal endpoint, sebelum mencetak output. Koneksi database baru dibuka ketika `getDatabaseConnection()` dipanggil. Session baru dimulai saat `startUserSession()` dipanggil; endpoint publik seperti kategori tidak membuat sesi. Pemeriksaan izin login/admin belum diimplementasikan.
 
@@ -109,7 +119,7 @@ sendJsonResponse(['message' => 'Berhasil.']);
 - `sendJsonResponse($data, $statusCode = 200)` mengirim JSON dan menghentikan eksekusi. Gunakan status `201` setelah berhasil membuat data.
 - `sendErrorResponse($message, $statusCode)` mengirim `{"error":"..."}` dan menghentikan eksekusi.
 - `requireRequestMethod('GET')` menolak method lain dengan status `405` dan header `Allow: GET`.
-- `readJsonBody()` mensyaratkan `Content-Type: application/json` (parameter charset boleh disertakan). Content-Type lain menghasilkan `415`.
+- `requireJsonContentType()` mensyaratkan `Content-Type: application/json` (parameter charset boleh disertakan). Content-Type lain menghasilkan `415`. `readJsonBody()` juga menjalankan pemeriksaan ini.
 - Body kosong, JSON rusak, atau JSON bukan objek menghasilkan `400`. Objek kosong `{}` diperbolehkan; field wajib tetap harus divalidasi oleh endpoint. Input yang benar dikembalikan sebagai associative array, termasuk data nested.
 - Warning PHP yang aktif diubah menjadi exception agar tidak mencemari respons JSON. Exception internal menghasilkan `500` tanpa stack trace atau detail database di body respons.
 
@@ -216,7 +226,7 @@ Contoh respons (ID mengikuti database):
 
 Respons tidak menyertakan password atau hash. Registrasi memulai sesi, meregenerasi ID sesi, lalu menyimpan hanya `user_id` sebagai identitas login. Data sesi sebelumnya diganti pada registrasi berhasil. Cookie bernama `foodhub_session` memakai `HttpOnly`, `SameSite=Lax`, serta `Secure` ketika request terdeteksi menggunakan HTTPS langsung. Cookie tidak diberi masa berlaku persisten (`lifetime = 0`). Jika HTTPS diterminasi di reverse proxy, konfigurasi deteksi HTTPS harus disesuaikan dengan proxy tepercaya sebelum deployment.
 
-**Batas implementasi:** registrasi dan login sudah membuat sesi di server, tetapi `action=me` dan `action=logout` belum tersedia. Frontend memanggil `action=me` saat setiap halaman dimuat, sehingga status login belum dapat ditampilkan secara konsisten setelah redirect/reload sampai tahap 8C selesai. Jangan menganggap tampilan mode demo sebagai bukti sesi backend. Aksi selain `register` dan `login` saat ini mengembalikan `404`.
+**Status nomor 8:** `register`, `login`, `me`, dan `logout` sudah tersedia. Frontend memanggil `me` setiap halaman dimuat dan menggunakan identitas dari API saja. Registrasi juga mencabut token Ingat saya akun sebelumnya pada browser yang sama agar sesi akun lama tidak dipulihkan setelah beralih akun. Aksi yang tidak dikenal mengembalikan `404`.
 
 ### Respons gagal
 
@@ -273,7 +283,9 @@ Gunakan akun yang sudah dibuat melalui registrasi atau akun lokal yang memang te
 
 Batas minimal 8 karakter hanya diterapkan saat membuat password melalui registrasi. Login memverifikasi password yang tersimpan dan tidak menerapkan ulang batas minimum registrasi pada password lama.
 
-**Opsi Ingat saya:** `remember` diterima untuk kompatibilitas dengan frontend, tetapi baik `true` maupun `false` saat ini tetap membuat cookie sesi nonpersisten. Belum ada token login persisten, pemulihan login setelah browser ditutup, atau tabel penyimpanan token. Jangan menganggap pengaturan `localStorage` frontend sebagai login persisten yang aman. Fitur tersebut memerlukan implementasi token terpisah.
+**Opsi Ingat saya:** `remember: true` membuat cookie `foodhub_remember` dengan masa berlaku absolut 30 hari. Cookie berisi selector acak dan verifier acak 256-bit; hanya hash SHA-256 verifier yang disimpan pada `remember_tokens`, bukan password atau token mentah. Jika sesi PHP tidak tersedia, `me` dapat memverifikasi token ini, meregenerasi sesi, dan merotasi verifier. Token lama tidak berlaku setelah rotasi, logout, atau kedaluwarsa. Masa berlaku tidak diperpanjang saat pemulihan.
+
+`remember: false` atau field yang tidak dikirim memakai sesi biasa dan mencabut token Ingat saya browser tersebut jika ada. Token pada perangkat lain tidak dicabut. Cookie sesi maupun remember memakai `HttpOnly`, `SameSite=Lax`, serta `Secure` saat HTTPS terdeteksi. Tidak ada identitas atau token autentikasi yang disimpan frontend ke localStorage/sessionStorage.
 
 ### Alur login
 
@@ -282,7 +294,7 @@ Batas minimal 8 karakter hanya diterapkan saat membuat password melalui registra
 3. Periksa password dengan `password_verify()`. Untuk email tidak terdaftar, verifikasi tetap dijalankan terhadap hash dummy agar tidak langsung keluar tanpa proses bcrypt.
 4. Tolak kredensial salah dengan pesan yang sama, tanpa memberi tahu apakah email terdaftar.
 5. Setelah kredensial benar, mulai sesi dan regenerasi ID-nya.
-6. Ganti data sesi menjadi hanya `user_id`, lalu simpan sesi.
+6. Ganti data sesi dengan `user_id` serta selector token jika Ingat saya aktif, lalu simpan sesi.
 7. Kirim informasi pengguna dari database tanpa password atau hash. ID dan role dari body request tidak digunakan.
 
 ### Respons berhasil — 200
@@ -326,9 +338,59 @@ Respons kredensial salah:
 - Di Postman, kirim request login dengan akun yang benar. Pastikan status `200`, respons `user`, dan cookie `foodhub_session` diterima.
 - Coba password salah dan email yang tidak terdaftar. Keduanya harus menghasilkan `401` dengan pesan yang sama.
 - Buka `frontend/masuk.html` melalui web server. Handler login sudah memakai endpoint ini dan kini tidak lagi mencoba akun demo lokal jika API menolak request atau tidak dapat dihubungi.
-- Pemeriksaan sesi ketika halaman dimuat (`initAuth`) masih memiliki fallback demo lama dan belum terhubung ke endpoint `me`. Login end-to-end lintas halaman baru dapat diuji sepenuhnya setelah tahap 8C; logout menunggu tahap 8D. Pengujian otomatis memeriksa sesi melalui route khusus pada router sementara, bukan endpoint publik tambahan.
+- Inisialisasi halaman (`initAuth`) memanggil `me`. Gagal jaringan atau respons tidak valid membuat frontend menganggap pengguna tidak masuk, menampilkan pesan, dan tidak membuka konten terlindungi. Tidak ada fallback ke akun/sesi demo lokal.
+- Tombol logout navbar dan sidebar hanya menganggap logout berhasil setelah API sukses. Kegagalan tidak diabaikan dan tidak menyebabkan redirect palsu.
+- Submit autentikasi ganda dicegah selama request berjalan. Identitas lama `fh_s` dibersihkan; data demo fitur lain tidak dipakai untuk autentikasi.
 
-Sebelum digunakan di produksi, tambahkan pembatasan percobaan login dan mekanisme login persisten jika dibutuhkan. Tahap ini belum menerapkan rate limiting.
+Sebelum digunakan di produksi, tambahkan pembatasan percobaan login. Tahap ini belum menerapkan rate limiting. Gunakan HTTPS dan pastikan konfigurasi reverse proxy tepercaya meneruskan status HTTPS secara benar; kode tidak mempercayai header proxy bebas.
+
+## API pemeriksaan sesi — 8C
+
+```http
+GET /FoodHub/backend/api/auth.php?action=me
+```
+
+Endpoint tidak memerlukan body JSON. Browser mengirim cookie melalui `credentials: 'same-origin'` pada frontend.
+
+- Session berisi ID akun yang masih ada: `200` dengan `{"user":{"id":4,"name":"Budi Santoso","email":"budi@example.com","role":"member"}}` (contoh data).
+- Tidak login: `200` dengan `{"user":null}`, bukan `401`.
+- Session tidak ada, tetapi token Ingat saya valid: buat sesi baru, rotasi token, dan kirim pengguna yang ditemukan.
+- Token rusak, tidak dikenal, kedaluwarsa, atau sudah dipakai: kirim `user: null`. Respons anonim tidak mengirim `Set-Cookie`, agar respons tab yang kalah dalam pemulihan paralel tidak menimpa cookie login baru dari tab lain. Token tidak valid tidak dipercaya walaupun cookie lama masih tersimpan di browser; login/logout berikutnya mengelola cookie secara eksplisit.
+- Akun sesi telah dihapus: cabut sesi/token di server dan kirim `user: null`.
+- Sesi yang berasal dari Ingat saya tetap memeriksa selector token di database. Jika token dicabut/kedaluwarsa, sesi terkait tidak tetap login.
+- Role dan nama selalu dibaca ulang dari database, bukan dari nilai lama di session/localStorage atau query string.
+- Method selain GET menghasilkan `405` dengan `Allow: GET`. Kesalahan database/sesi menghasilkan JSON `500` tanpa detail internal.
+
+Respons hanya berisi `id`, `name`, `email`, dan `role`; hash/password tidak pernah disertakan. Endpoint ini bukan pengganti pemeriksaan izin pada endpoint bisnis yang akan dibuat di nomor 9.
+
+## API logout — 8D
+
+```http
+POST /FoodHub/backend/api/auth.php?action=logout
+Content-Type: application/json
+```
+
+Body tidak wajib, sesuai request frontend. Content-Type JSON diwajibkan agar endpoint tidak menerima POST form lintas situs; backend tidak membuka CORS lintas origin. Method GET menghasilkan `405` dengan `Allow: POST`; Content-Type lain menghasilkan `415`.
+
+Logout mencabut token Ingat saya pada browser tersebut (termasuk lewat selector yang disimpan di sesi), menghapus data sesi server, dan menghapus cookie `foodhub_session` serta `foodhub_remember` jika ada. Session ID/token sebelum logout tidak dapat digunakan kembali. Logout anonim atau berulang tetap aman dan menghasilkan:
+
+```json
+{
+  "message": "Berhasil keluar."
+}
+```
+
+HTTP status `200`. Perangkat lain tetap login. Jika pencabutan token atau sesi gagal, respons berupa error `500`, bukan keberhasilan semu.
+
+### Alur pengujian manual nomor 8
+
+1. Jalankan web server dan database, lalu terapkan migrasi jika menggunakan database lama.
+2. Buka `frontend/daftar.html`, daftarkan email baru, dan pastikan respons register `201`.
+3. Setelah redirect/reload, periksa request `me`: harus `200` dengan akun yang baru dibuat.
+4. Tekan Keluar. Pastikan logout `200`, halaman berpindah ke beranda, dan `me` berikutnya mengembalikan `user: null`.
+5. Login kembali. Password salah harus `401`; kredensial benar `200` dengan role sesuai database.
+6. Coba login dengan Ingat saya. Melalui pengelola cookie browser, hapus **hanya** `foodhub_session` dan pertahankan `foodhub_remember`, kemudian reload. Sesi dipulihkan lewat `me` dan verifier remember berubah.
+7. Logout lagi. Cookie/token lama tidak dapat memulihkan login. Halaman member/admin tanpa sesi diarahkan ke login.
 
 ## Pengujian otomatis
 
@@ -338,7 +400,7 @@ Dari direktori utama proyek, jalankan:
 php backend/tests/api.php
 ```
 
-Syarat: PHP CLI dengan `pdo_mysql`, `mbstring`, session, `proc_open` dan HTTP stream aktif, serta database lokal yang sudah dikonfigurasi. Script menjalankan server PHP sementara pada port lokal yang tersedia, kemudian menghentikannya dan menghapus router sementara setelah selesai. Tidak perlu menjalankan server pengujian sendiri.
+Syarat: PHP CLI dengan `pdo_mysql`, `mbstring`, session, `proc_open` dan HTTP stream aktif, serta database lokal yang sudah dikonfigurasi dan memiliki tabel `remember_tokens`. Script menjalankan server PHP sementara pada port lokal yang tersedia, kemudian menghentikannya dan menghapus router sementara setelah selesai. Tidak perlu menjalankan server pengujian sendiri.
 
 Pengujian mencakup:
 
@@ -357,8 +419,22 @@ Pengujian mencakup:
 - Password salah dan email tidak terdaftar menghasilkan `401` dengan pesan yang sama.
 - Login member/admin, normalisasi email, password dengan spasi, serta respons tanpa password/hash.
 - Regenerasi ID sesi saat login, penolakan cookie lama, dan identitas sesi yang tetap utuh jika login berikutnya gagal.
-- Login dengan `remember` tidak menerbitkan cookie persisten sebelum fitur token diimplementasikan.
+- Me anonim, sesi registrasi/login, penolakan ID palsu, serta pembacaan nama/role terbaru.
+- Pemulihan Ingat saya, penyimpanan hash saja, kedaluwarsa UTC, rotasi token, serta penolakan replay/token palsu/rusak.
+- Logout biasa/berulang dan invalidasi cookie/token sebelum logout, termasuk sesi lama yang terkait selector remember yang dicabut.
+- Dua pemulihan dengan snapshot token yang sama: respons yang kalah tidak menimpa cookie jar yang sudah menerima sesi/token pemenang.
+- Login tanpa remember serta registrasi akun baru mencabut token akun sebelumnya pada browser yang sama.
+- Penghapusan akun mengakhiri autentikasi dan menghapus token terkait lewat foreign key.
 
 **Pengujian autentikasi menulis ke database lokal:** script membuat dua akun dengan alamat email acak khusus pengujian, mengubah salah satu akun uji menjadi admin untuk memeriksa login berdasarkan role, lalu menghapus hanya akun uji tersebut dalam blok `finally`, termasuk ketika assertion gagal. Sesi pengujian menggunakan direktori sementara terpisah yang juga dibersihkan. Akun yang sudah ada tidak diubah. Gunakan database pengembangan, bukan database produksi. Jika proses dihentikan paksa sebelum cleanup berjalan, akun uji berawalan `foodhub-test-` dapat tertinggal dan harus diperiksa secara manual.
 
-Endpoint resep, profil, favorit, ulasan, admin, serta aksi me/logout belum diimplementasikan.
+Tes frontend tanpa dependency tambahan:
+
+```sh
+node --check frontend/js/main.js
+node --test frontend/tests/auth.test.js
+```
+
+Tes Node memakai VM/mock DOM/fetch untuk memeriksa kontrak autentikasi, fail-closed, proteksi halaman, redirect, kegagalan logout, serta tidak adanya sumber autentikasi lokal. Tes PHP menggunakan HTTP dan database lokal nyata, termasuk token remember. Belum ada pengujian browser nyata yang terotomatisasi.
+
+Seluruh endpoint autentikasi nomor 8 selesai. Endpoint resep, profil, favorit, ulasan, admin, dan helper otorisasi nomor 9 belum diimplementasikan.

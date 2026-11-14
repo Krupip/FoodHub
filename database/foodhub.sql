@@ -151,6 +151,20 @@ CREATE TABLE `reviews` (
 ) ENGINE=InnoDB;
 
 -- --------------------------------------------------------------------------
+-- 9. remember_tokens : token login persisten, hash saja, kedaluwarsa UTC
+-- --------------------------------------------------------------------------
+CREATE TABLE `remember_tokens` (
+  `selector`   CHAR(24) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `user_id`    INT UNSIGNED NOT NULL,
+  `token_hash` CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `expires_at` DATETIME NOT NULL,
+  PRIMARY KEY (`selector`),
+  KEY `idx_remember_user` (`user_id`),
+  KEY `idx_remember_expiry` (`expires_at`),
+  CONSTRAINT `fk_remember_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- --------------------------------------------------------------------------
 -- VIEW v_recipe_cards : data kartu resep (Beranda, Daftar Resep, Favorit)
 -- --------------------------------------------------------------------------
 CREATE VIEW `v_recipe_cards` AS

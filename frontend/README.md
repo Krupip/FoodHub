@@ -23,7 +23,9 @@ frontend/
 ├── css/
 │   └── style.css            # Seluruh aturan gaya, palet warna, layout grid & responsif
 ├── js/
-│   └── main.js              # Logika interaktif, routing halaman, kalkulator porsi, client API & offline fallback
+│   └── main.js              # Auth online-only, logika halaman, client API & fallback non-auth
+├── tests/
+│   └── auth.test.js         # Tes autentikasi dengan node:test + VM, tanpa dependency
 └── img/                     # Aset gambar resep lokal & logo FoodHub
 ```
 
@@ -66,7 +68,7 @@ frontend/
 
 ## Akun Demo Pengujian
 
-Akun berikut tersedia pada data awal database. Login memerlukan backend PHP dan database aktif serta data akun yang sesuai; akun demo lokal tidak lagi dipakai sebagai fallback ketika request login gagal. Integrasi status login setelah pindah halaman masih menunggu endpoint `auth.php?action=me` (tahap 8C).
+Akun berikut mengacu pada data awal database, bukan akun login lokal. Akun hanya dapat dipakai jika benar-benar tersedia di database backend dengan kredensial yang sesuai. Backend PHP dan database harus aktif; tidak ada autentikasi demo/offline.
 
 | Email | Kata Sandi | Peran | Hak Akses |
 |---|---|---|---|
@@ -76,13 +78,38 @@ Akun berikut tersedia pada data awal database. Login memerlukan backend PHP dan 
 
 ---
 
-## Arsitektur Integrasi: API & Offline Fallback
+## Autentikasi Online-Only (Nomor 8)
 
-Frontend dibangun dengan pendekatan **Hybrid Client Architecture**:
-1. **Mode Online (Backend Terhubung)**:  
-   `main.js` mengirim permintaan asinkron (`fetch()`) ke endpoint PHP di `../backend/api/` (`auth.php`, `recipes.php`, `favorites.php`, `reviews.php`, `profile.php`, `admin/recipes.php`).
-2. **Mode Offline (Backend Belum Aktif / Demo Standalone)**:  
-   Sejumlah halaman masih memakai data lokal di memori dan `localStorage` saat API gagal, misalnya untuk menampilkan katalog dan FAQ. **Login dan registrasi memerlukan backend:** kegagalan request login ditampilkan sebagai error, bukan digantikan login akun demo. Fallback sesi pada inisialisasi halaman masih ada dan akan ditinjau saat integrasi autentikasi diselesaikan; tampilan lokal tidak membuktikan pengguna sudah terautentikasi di server.
+Integrasi frontend **registrasi, login, pemeriksaan sesi (`me`), dan logout sudah selesai** sesuai kontrak berikut. Pastikan database lama sudah mendapat migrasi `database/migrations/001_remember_tokens.sql` untuk fitur Ingat saya. Backend memiliki pengujian HTTP dengan database lokal; tes frontend memakai mock DOM/fetch, sehingga pemeriksaan tampilan langsung di browser tetap disarankan.
+
+| Endpoint `backend/api/auth.php` | Request | Respons sukses |
+|---|---|---|
+| `POST ?action=register` | JSON `{name,email,password}` | `201 {user:{id,name,email,role}}` |
+| `POST ?action=login` | JSON `{email,password,remember:boolean}` | `200 {user:{id,name,email,role}}` |
+| `GET ?action=me` | Cookie server, tanpa body | `200 {user:{id,name,email,role}}` atau `{user:null}` |
+| `POST ?action=logout` | Header `Content-Type: application/json`; body tidak wajib | `200 {message:"Berhasil keluar."}` |
+
+- Seluruh request memakai `credentials: 'same-origin'`. Sajikan frontend dan backend pada origin yang sama; cookie sesi/remember dikelola server, bukan JavaScript.
+- **Ingat saya nyata:** `remember: true` meminta token aman **HttpOnly selama 30 hari** dari server; `false` memakai sesi biasa. Frontend tidak menyimpan identitas atau token autentikasi ke `localStorage`/`sessionStorage`.
+- Setiap inisialisasi halaman memanggil `me`. Backend wajib memeriksa database untuk keberadaan akun dan peran terbaru; akun yang dihapus/peran yang berubah tidak boleh dipulihkan dari demo lokal.
+- Jika `me` gagal (jaringan, HTTP error, JSON/bentuk respons rusak), pengguna dianggap tidak masuk (**fail closed**), notifikasi ditampilkan, dan konten member/admin tetap tersembunyi. Pengunjung tanpa sesi diarahkan ke login dengan `next`; kegagalan pemeriksaan sesi juga meneruskan notifikasi ke form login. Member yang membuka admin diarahkan ke beranda.
+- Redirect `next` tetap dibatasi ke nama halaman lokal yang diizinkan pola frontend, bukan URL eksternal.
+- Login/registrasi hanya berhasil setelah API mengembalikan objek pengguna valid (`id`, `name`, `email`, `role` member/admin). Respons HTTP sukses dengan JSON rusak, pengguna tidak lengkap, atau payload error tetap ditolak.
+- Tombol logout navigasi dan sidebar memakai handler yang sama. Pengguna baru dianggap keluar dan diarahkan ke beranda setelah respons API valid; kegagalan tetap di halaman, menampilkan error, serta memungkinkan percobaan ulang. Backend bertanggung jawab mencabut cookie sesi **dan** token remember.
+- Submit login/registrasi dan klik logout ganda dicegah selama request berlangsung.
+- Migrasi menghapus **hanya identitas lama `fh_s`** dari kedua storage. Data pengguna demo `fh_users` tetap dipertahankan dan **tidak pernah dipakai untuk autentikasi**. Seed demo tidak lagi berisi password; saat daftar demo dibaca oleh fitur lokal, hanya properti plaintext `pass` lama yang dibuang, tanpa menghapus akun/favorit/metadata lainnya.
+- Backend tetap wajib mengotorisasi setiap endpoint terlindungi; penyembunyian halaman di frontend bukan pengganti otorisasi server. Error backend diharapkan berupa `{error:string}` dengan status HTTP yang sesuai.
+
+## Fitur Lain: API, Data Lokal & Fallback
+
+`main.js` juga memanggil `recipes.php`, `favorites.php`, `reviews.php`, `profile.php`, dan `admin/recipes.php`. Integrasi autentikasi di atas **tidak berarti seluruh fitur lain sudah tersambung backend**:
+
+- Katalog/detail resep dan sebagian halaman admin masih memiliki fallback data lokal ketika API gagal.
+- FAQ khusus tetap disimpan di `localStorage`.
+- Daftar/jumlah pengguna pada panel admin masih memakai `users()`/`fh_users` demo lokal; hapus pengguna demo bukan penghapusan akun database.
+- Profil dan favorit masih memiliki tampilan/fallback lokal terbatas sambil menunggu integrasi lanjutan. Data lokal bukan bukti sesi atau hak admin.
+
+Backend profil, administrasi pengguna, dan favorit lanjutan berada di luar scope nomor 8 ini. Tidak ada fallback autentikasi saat API tidak tersedia.
 
 ---
 
@@ -111,8 +138,20 @@ Frontend dibangun dengan pendekatan **Hybrid Client Architecture**:
      ```
      http://localhost/FoodHub/frontend/
      ```
-   - Atau gunakan ekstensi **Live Server** di VS Code: klik kanan pada `frontend/index.html` → pilih **Open with Live Server**.
+   - Di Laragon, gunakan Apache/PHP dan URL proyek yang setara. Pastikan endpoint `backend/api/auth.php` dan database tersedia pada origin yang sama. Gunakan HTTPS pada deployment untuk cookie aman.
 
-2. **Membuka Langsung di Browser**:
-   - Cukup klik dua kali berkas `frontend/index.html` pada peramban web modern (Google Chrome, Mozilla Firefox, Microsoft Edge, Safari).
+2. **Pratinjau Statis / Offline**:
+   - Live Server atau membuka `frontend/index.html` langsung hanya cocok untuk pratinjau fitur lokal/publik. Cara ini tidak menjalankan PHP; autentikasi tidak tersedia dan halaman terlindungi tidak dibuka.
+
+## Menjalankan Tes Frontend
+
+Dari root proyek, dengan Node.js yang mendukung `node:test` (Node 18+):
+
+```sh
+node --check frontend/js/main.js
+node --check frontend/tests/auth.test.js
+node --test frontend/tests/auth.test.js
+```
+
+Tes memakai modul bawaan `node:test`, `node:assert`, dan `node:vm` dengan mock DOM, storage, serta fetch. Cakupan meliputi otoritas API pada `me`/login/registrasi, penolakan payload rusak, proteksi member/admin, migrasi identitas lokal, logout sukses/gagal, pembatasan redirect, dan pencegahan request ganda. Tes tidak membutuhkan server/database dan tidak menggantikan uji integrasi cookie HttpOnly/remember 30 hari dengan backend nyata.
 
