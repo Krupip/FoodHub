@@ -1,2 +1,5 @@
 powershell.bat
 
+# Kredensial database lokal
+/backend/config/database.local.php
+
