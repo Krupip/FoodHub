@@ -144,6 +144,7 @@ try {
     $router = '<?php require_once ' . var_export($backendPath . '/includes/bootstrap.php', true) . ';';
     $router .= '$categoriesPath = ' . var_export($backendPath . '/api/categories.php', true) . ';';
     $router .= '$authPath = ' . var_export($backendPath . '/api/auth.php', true) . ';';
+    $router .= '$recipesPath = ' . var_export($backendPath . '/api/recipes.php', true) . ';';
     $guardedPaths = [
         '/api/profile.php' => $backendPath . '/api/profile.php',
         '/api/favorites.php' => $backendPath . '/api/favorites.php',
@@ -164,6 +165,9 @@ if (isset($guardedPaths[$path])) {
 switch ($path) {
     case '/auth':
         require $authPath;
+        exit;
+    case '/recipes':
+        require $recipesPath;
         exit;
     case '/protected/member':
     case '/protected/admin':
@@ -792,6 +796,137 @@ PHP;
     $me = request($baseUrl, '/auth?action=me', 'GET', null, 'application/json', $previousAccountCookie);
     expect($me['body'] === ['user' => null], 'Registrasi mencabut token remember akun sebelumnya pada browser yang sama.');
 
+    // ---- 10A: daftar resep publik, memakai fixture khusus yang dihapus pada blok finally ----
+    $unique = 'uji' . bin2hex(random_bytes(6));
+    $fixtures = [
+        'a' => ['Alfa ' . $unique, 20, 'mudah', 1, '2030-01-02 08:00:00', ['Sehat', 'Cepat']],
+        'b' => ['Beta ' . $unique, 90, 'sulit', 1, '2030-01-01 08:00:00', ['Sehat']],
+        'c' => ['Gamma ' . $unique, 10, 'mudah', 0, '2030-01-05 08:00:00', ['Sehat']],
+        'd' => ['Diskon 100% ' . $unique, 40, 'sedang', 1, '2030-01-03 08:00:00', []],
+    ];
+    $recipeIds = [];
+    $insertRecipe = $testPdo->prepare('INSERT INTO recipes (title, slug, region, story, cook_time_minutes, difficulty, servings, is_published, created_at) VALUES (?, ?, ?, ?, ?, ?, 2, ?, ?)');
+    $insertCategory = $testPdo->prepare('INSERT INTO recipe_categories (recipe_id, category_id) SELECT ?, id FROM categories WHERE name = ?');
+    foreach ($fixtures as $key => [$title, $minutes, $level, $published, $createdAt, $categoryNames]) {
+        $insertRecipe->execute([$title, $testPrefix . '-' . $key, 'Daerah Uji', 'Cerita ' . $title, $minutes, $level, $published, $createdAt]);
+        $recipeIds[$key] = (int) $testPdo->lastInsertId();
+        foreach ($categoryNames as $categoryName) {
+            $insertCategory->execute([$recipeIds[$key], $categoryName]);
+            expect($insertCategory->rowCount() === 1, 'Kategori fixture tersedia: ' . $categoryName);
+        }
+    }
+    $insertIngredient = $testPdo->prepare('INSERT INTO recipe_ingredients (recipe_id, name, quantity, unit, sort_order) VALUES (?, ?, 1, ?, ?)');
+    $insertIngredient->execute([$recipeIds['b'], 'bahanrahasia' . $unique . ' satu', 'g', 1]);
+    $insertIngredient->execute([$recipeIds['b'], 'bahanrahasia' . $unique . ' dua', 'g', 2]);
+    $insertIngredient->execute([$recipeIds['c'], 'bahantersembunyi' . $unique, 'g', 1]);
+    $memberIds = [];
+    foreach ($testEmails as $email) {
+        $stmt = $testPdo->prepare('SELECT id FROM users WHERE email = ?');
+        $stmt->execute([$email]);
+        $memberIds[] = (int) $stmt->fetchColumn();
+    }
+    expect(!in_array(0, $memberIds, true), 'Dua akun uji tersedia untuk favorit dan ulasan fixture.');
+    $insertFavorite = $testPdo->prepare('INSERT INTO favorites (user_id, recipe_id) VALUES (?, ?)');
+    $insertFavorite->execute([$memberIds[0], $recipeIds['a']]);
+    $insertFavorite->execute([$memberIds[1], $recipeIds['a']]);
+    $insertFavorite->execute([$memberIds[0], $recipeIds['b']]);
+    $insertReview = $testPdo->prepare('INSERT INTO reviews (recipe_id, user_id, rating, comment) VALUES (?, ?, ?, ?)');
+    $insertReview->execute([$recipeIds['b'], $memberIds[0], 5, 'Mantap']);
+    $insertReview->execute([$recipeIds['b'], $memberIds[1], 4, 'Enak']);
+
+    $listRecipes = static fn (array $query): array => request($baseUrl, '/recipes?' . http_build_query($query));
+    $listIds = static fn (array $response): array => array_column($response['body']['recipes'], 'id');
+    $expectIds = static function (array $query, array $keys, string $message) use ($listRecipes, $listIds, $recipeIds): void {
+        $response = $listRecipes($query);
+        $expected = array_map(static fn (string $key): int => $recipeIds[$key], $keys);
+        expect($response['status'] === 200 && $listIds($response) === $expected && $response['body']['total'] === count($expected), $message);
+    };
+
+    $response = $listRecipes(['q' => $unique]);
+    expect($response['status'] === 200 && in_array('Content-Type: application/json; charset=utf-8', $response['headers'], true), 'Daftar resep mengembalikan JSON 200.');
+    expectNoAuthHeaders($response, 'Daftar resep publik tidak membuat sesi atau token CSRF.');
+    expect(array_keys($response['body']) === ['recipes', 'total', 'limit', 'offset'] && $response['body']['limit'] === 100 && $response['body']['offset'] === 0, 'Respons daftar memuat recipes, total, limit default 100, dan offset 0.');
+    $expectIds(['q' => $unique], ['a', 'b', 'd'], 'Resep disembunyikan tidak tampil; urutan default popular mengikuti jumlah favorit (2, 1, 0).');
+    $recipeA = $response['body']['recipes'][0];
+    expect(array_keys($recipeA) === ['id', 'title', 'slug', 'region', 'story', 'image_path', 'cook_time_minutes', 'difficulty', 'servings', 'is_published', 'created_at', 'avg_rating', 'review_count', 'favorite_count', 'categories'], 'Setiap resep memuat field yang dibutuhkan kartu frontend.');
+    expect($recipeA['title'] === $fixtures['a'][0] && $recipeA['story'] === 'Cerita ' . $fixtures['a'][0] && $recipeA['image_path'] === null && $recipeA['region'] === 'Daerah Uji', 'Judul, deskripsi, daerah, dan gambar kosong dikirim apa adanya.');
+    expect($recipeA['cook_time_minutes'] === 20 && $recipeA['servings'] === 2 && $recipeA['is_published'] === true && $recipeA['difficulty'] === 'mudah', 'Angka dan status publikasi dikirim sebagai integer/boolean JSON.');
+    expect($recipeA['avg_rating'] === null && $recipeA['review_count'] === 0 && $recipeA['favorite_count'] === 2, 'Resep tanpa ulasan memiliki rating null dan jumlah favorit benar.');
+    expect($recipeA['categories'] === ['Cepat', 'Sehat'], 'Kategori dikirim sebagai array nama terurut, bukan string gabungan.');
+    $recipeB = $response['body']['recipes'][1];
+    expect($recipeB['avg_rating'] === 4.5 && $recipeB['review_count'] === 2 && $recipeB['favorite_count'] === 1, 'Rating rata-rata, jumlah ulasan, dan favorit dihitung dari database.');
+    expect($response['body']['recipes'][2]['categories'] === [], 'Resep tanpa kategori memiliki array kategori kosong.');
+    $response = $listRecipes([]);
+    expect($response['status'] === 200 && $response['body']['total'] >= 3 && !in_array($recipeIds['c'], $listIds($response), true), 'Daftar tanpa filter hanya memuat resep tayang.');
+
+    $expectIds(['q' => $unique, 'sort' => 'title'], ['a', 'b', 'd'], 'Sort title mengurutkan abjad.');
+    $expectIds(['q' => $unique, 'sort' => 'time'], ['a', 'd', 'b'], 'Sort time mengurutkan waktu memasak tercepat.');
+    $expectIds(['q' => $unique, 'sort' => 'newest'], ['d', 'a', 'b'], 'Sort newest mengurutkan resep terbaru.');
+    $expectIds(['q' => $unique, 'sort' => 'rating'], ['b', 'a', 'd'], 'Sort rating mengutamakan rating tertinggi dan menaruh tanpa rating terakhir.');
+    $expectIds(['q' => $unique, 'sort' => 'popular'], ['a', 'b', 'd'], 'Sort popular eksplisit sama dengan default.');
+
+    $expectIds(['q' => strtoupper($unique)], ['a', 'b', 'd'], 'Pencarian judul tidak membedakan huruf besar/kecil.');
+    $expectIds(['q' => '  Alfa ' . $unique . '  '], ['a'], 'Pencarian dipotong spasi dan mencocokkan sebagian judul.');
+    $expectIds(['q' => 'bahanrahasia' . $unique], ['b'], 'Pencarian bahan menemukan resep tanpa duplikat meski dua bahan cocok.');
+    $expectIds(['q' => 'bahantersembunyi' . $unique], [], 'Bahan milik resep disembunyikan tidak membocorkan resep.');
+    $expectIds(['q' => 'Gamma ' . $unique], [], 'Judul resep disembunyikan tidak dapat ditemukan.');
+    $expectIds(['q' => '100% ' . $unique], ['d'], 'Karakter % dicari sebagai teks biasa.');
+    $expectIds(['q' => '%' . $unique], [], 'Wildcard % tidak mencocokkan semua judul.');
+    $expectIds(['q' => 'Alfa_' . $unique], [], 'Wildcard _ tidak mencocokkan spasi.');
+    $expectIds(['q' => "' OR 1=1 -- "], [], 'Input mirip SQL injection diperlakukan sebagai teks pencarian.');
+    $response = $listRecipes(['q' => '   ']);
+    expect($response['status'] === 200 && $response['body']['total'] >= 3, 'Query q berisi spasi saja dianggap tidak ada filter.');
+
+    $expectIds(['q' => $unique, 'category' => 'Sehat', 'sort' => 'title'], ['a', 'b'], 'Filter kategori memakai nama kategori.');
+    $expectIds(['q' => $unique, 'category' => 'sehat', 'sort' => 'title'], ['a', 'b'], 'Filter kategori juga menerima slug/huruf kecil.');
+    $expectIds(['q' => $unique, 'category' => 'Cepat'], ['a'], 'Filter kategori memilih resep dengan banyak kategori.');
+    $response = $listRecipes(['q' => $unique, 'category' => 'Sehat', 'sort' => 'title']);
+    expect($response['body']['recipes'][0]['categories'] === ['Cepat', 'Sehat'], 'Filter kategori tidak menghilangkan kategori lain pada hasil.');
+    $expectIds(['q' => $unique, 'category' => 'Kategori Tidak Ada'], [], 'Kategori tidak dikenal menghasilkan daftar kosong, bukan error.');
+    $expectIds(['q' => $unique, 'difficulty' => 'mudah'], ['a'], 'Filter difficulty mudah hanya memuat resep tayang.');
+    $expectIds(['q' => $unique, 'difficulty' => 'SULIT'], ['b'], 'Filter difficulty tidak membedakan huruf besar/kecil.');
+    $expectIds(['q' => $unique, 'max_time' => 20, 'sort' => 'time'], ['a'], 'Filter max_time termasuk batas atas.');
+    $expectIds(['q' => $unique, 'min_time' => 40, 'sort' => 'time'], ['d', 'b'], 'Filter min_time termasuk batas bawah (dipakai opsi lebih dari 60 menit).');
+    $expectIds(['q' => $unique, 'min_time' => 40, 'max_time' => 40], ['d'], 'Rentang waktu satu nilai tetap valid.');
+    $expectIds(['q' => $unique, 'category' => 'Sehat', 'difficulty' => 'mudah', 'max_time' => 30], ['a'], 'Semua filter digabung dengan AND.');
+    $expectIds(['q' => $unique, 'category' => '', 'difficulty' => ' ', 'sort' => 'title'], ['a', 'b', 'd'], 'Filter kosong diabaikan.');
+
+    $response = $listRecipes(['q' => $unique, 'sort' => 'title', 'limit' => 2]);
+    expect($response['status'] === 200 && $listIds($response) === [$recipeIds['a'], $recipeIds['b']], 'Limit membatasi jumlah resep yang dikirim.');
+    expect($response['body']['total'] === 3 && $response['body']['limit'] === 2 && $response['body']['offset'] === 0, 'Total tetap jumlah seluruh hasil meski dibatasi limit.');
+    $response = $listRecipes(['q' => $unique, 'sort' => 'title', 'limit' => 2, 'offset' => 2]);
+    expect($listIds($response) === [$recipeIds['d']] && $response['body']['total'] === 3 && $response['body']['offset'] === 2, 'Offset melanjutkan halaman berikutnya.');
+    $response = $listRecipes(['q' => $unique, 'offset' => 3]);
+    expect($response['status'] === 200 && $response['body']['recipes'] === [] && $response['body']['total'] === 3, 'Offset melewati data menghasilkan array kosong.');
+    $response = $listRecipes(['q' => $unique, 'limit' => 100]);
+    expect($response['status'] === 200 && $response['body']['limit'] === 100, 'Limit maksimum 100 diterima.');
+
+    foreach ([
+        ['limit' => 0], ['limit' => 101], ['limit' => 'abc'], ['limit' => '1.5'], ['limit' => '-1'], ['limit' => '99999999999'],
+        ['offset' => -1], ['offset' => 'x'], ['offset' => 100001],
+        ['max_time' => 0], ['max_time' => 'abc'], ['max_time' => 65536], ['min_time' => '-5'],
+        ['min_time' => 50, 'max_time' => 40],
+        ['difficulty' => 'ekstrem'], ['sort' => 'id; DROP TABLE recipes'], ['sort' => 'created_at'],
+        ['q' => str_repeat('a', 101)], ['category' => str_repeat('b', 51)],
+        ['q' => ['a']], ['category' => ['Sehat']], ['sort' => ['title']], ['limit' => ['2']],
+    ] as $invalidQuery) {
+        expectError($listRecipes($invalidQuery), 422, 'Query tidak valid ditolak 422: ' . http_build_query($invalidQuery));
+    }
+    expectError(request($baseUrl, '/recipes?q=%FF'), 422, 'Teks query bukan UTF-8 ditolak.');
+    $response = request($baseUrl, '/recipes?q=' . str_repeat('a', 100));
+    expect($response['status'] === 200, 'Query q tepat 100 karakter diterima.');
+    $response = request($baseUrl, '/recipes?q=' . rawurlencode(str_repeat('界', 100)));
+    expect($response['status'] === 200, 'Batas panjang q dihitung per karakter Unicode, bukan byte.');
+    $response = request($baseUrl, '/recipes?unknown=1&q=' . rawurlencode($unique) . '&sort=title');
+    expect($response['status'] === 200 && $listIds($response) === [$recipeIds['a'], $recipeIds['b'], $recipeIds['d']], 'Parameter tidak dikenal diabaikan.');
+
+    foreach (['POST', 'PUT', 'PATCH', 'DELETE'] as $method) {
+        $response = request($baseUrl, '/recipes', $method, '{}');
+        expectError($response, 405, 'Daftar resep menolak method ' . $method . '.');
+        expect(in_array('Allow: GET', $response['headers'], true), 'Daftar resep mengirim Allow: GET untuk ' . $method . '.');
+    }
+    expectError(request($baseUrl, '/recipes?id=' . $recipeIds['a']), 501, 'Detail resep (10B) belum diimplementasikan dan tidak berpura-pura berhasil.');
+
     echo 'Semua pengujian lulus; akun dan sesi khusus pengujian dibersihkan setelah selesai.', PHP_EOL;
 } catch (Throwable $exception) {
     fwrite(STDERR, '[GAGAL] ' . $exception->getMessage() . PHP_EOL);
@@ -812,6 +947,14 @@ PHP;
         unlink($routerPath);
     }
     if ($testPdo instanceof PDO) {
+        try {
+            // Resep fixture menghapus bahan, kategori, favorit, dan ulasannya lewat ON DELETE CASCADE.
+            $stmt = $testPdo->prepare('DELETE FROM recipes WHERE slug LIKE ?');
+            $stmt->execute([$testPrefix . '-%']);
+        } catch (Throwable $exception) {
+            fwrite(STDERR, '[GAGAL] Pembersihan resep uji: ' . $exception->getMessage() . PHP_EOL);
+            $exitCode = 1;
+        }
         try {
             $stmt = $testPdo->prepare('DELETE FROM users WHERE email IN (?, ?)');
             $stmt->execute($testEmails);

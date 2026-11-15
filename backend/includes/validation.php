@@ -12,6 +12,47 @@ function requireRequestMethod(string $allowedMethod): void
     }
 }
 
+// Parameter query kosong dianggap tidak dikirim; nilai bukan teks atau bukan UTF-8 ditolak.
+function readQueryString(string $name, int $maxLength): ?string
+{
+    if (!array_key_exists($name, $_GET)) {
+        return null;
+    }
+
+    $value = $_GET[$name];
+
+    if (!is_string($value) || !mb_check_encoding($value, 'UTF-8') || str_contains($value, "\0")) {
+        sendErrorResponse("Parameter {$name} harus berupa teks yang valid.", 422);
+    }
+
+    $value = trim($value);
+
+    if ($value === '') {
+        return null;
+    }
+
+    if (mb_strlen($value, 'UTF-8') > $maxLength) {
+        sendErrorResponse("Parameter {$name} maksimal {$maxLength} karakter.", 422);
+    }
+
+    return $value;
+}
+
+function readQueryInt(string $name, int $min, int $max): ?int
+{
+    $value = readQueryString($name, 10);
+
+    if ($value === null) {
+        return null;
+    }
+
+    if (preg_match('/\A\d+\z/', $value) !== 1 || (int) $value < $min || (int) $value > $max) {
+        sendErrorResponse("Parameter {$name} harus bilangan bulat {$min}–{$max}.", 422);
+    }
+
+    return (int) $value;
+}
+
 function requireJsonContentType(): void
 {
     $contentType = strtolower(trim(explode(';', $_SERVER['CONTENT_TYPE'] ?? '')[0]));

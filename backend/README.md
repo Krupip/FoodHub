@@ -504,6 +504,84 @@ Kategori dan autentikasi publik tidak diberi guard login. `me` anonim tetap `200
 
 Lihat status dan respons di Network/Postman. Beberapa fitur frontend masih memiliki fallback demo yang dapat menyamarkan `501`; tampilan lokal tidak membuktikan backend bisnis sudah tersedia.
 
+## API daftar resep — 10A
+
+```http
+GET /FoodHub/backend/api/recipes.php
+```
+
+Endpoint publik (tanpa login, tanpa sesi/cookie/CSRF) hanya menerima `GET`. **Hanya resep tayang (`is_published = 1`) yang pernah dikirim**; resep disembunyikan admin tidak muncul, termasuk lewat pencarian judul atau bahan. Method lain menghasilkan `405` dengan `Allow: GET`.
+
+### Parameter query
+
+Semua parameter opsional dan dapat digabung (logika AND). Nilai kosong atau berisi spasi saja dianggap tidak dikirim. Parameter yang tidak dikenal diabaikan.
+
+| Parameter | Aturan |
+|---|---|
+| `q` | Maksimal 100 karakter. Mencari sebagian judul **atau** nama bahan, tanpa membedakan huruf besar/kecil. `%` dan `_` dicari sebagai teks biasa. |
+| `category` | Nama atau slug kategori, mis. `Makanan Berat` atau `makanan-berat`. Kategori tidak dikenal menghasilkan daftar kosong, bukan error. |
+| `max_time` / `min_time` | Bilangan bulat 1–65535 (menit), batas termasuk. `min_time` tidak boleh lebih besar dari `max_time`. |
+| `difficulty` | `mudah`, `sedang`, atau `sulit` (huruf besar diterima). |
+| `sort` | `popular` (default), `rating`, `newest`, `title`, atau `time`. Nilai lain ditolak; urutan tidak pernah disusun dari input mentah. |
+| `limit` | 1–100, default 100. |
+| `offset` | 0–100000, default 0. |
+
+Urutan `popular`: jumlah favorit terbanyak, lalu rating tertinggi, jumlah ulasan, judul, dan ID. Resep tanpa rating berada di akhir untuk `rating`/`popular`.
+
+Frontend mengirim `min_time=61` untuk opsi **Lebih dari 60 menit**. Sebelumnya opsi itu menghilangkan filter waktu sehingga semua resep tampil.
+
+### Respons berhasil — 200
+
+```json
+{
+  "recipes": [
+    {
+      "id": 1,
+      "title": "Rendang Daging Sapi",
+      "slug": "rendang-daging-sapi",
+      "region": "Sumatera Barat",
+      "story": "Olahan daging sapi empuk ...",
+      "image_path": "img/rendang.jpg",
+      "cook_time_minutes": 180,
+      "difficulty": "sulit",
+      "servings": 6,
+      "is_published": true,
+      "created_at": "2026-08-05 08:00:00",
+      "avg_rating": 5.0,
+      "review_count": 2,
+      "favorite_count": 1,
+      "categories": ["Makanan Berat"]
+    }
+  ],
+  "total": 14,
+  "limit": 100,
+  "offset": 0
+}
+```
+
+- `categories` berupa **array nama kategori** (terurut), bukan string `GROUP_CONCAT`. Filter kategori tidak menghilangkan kategori lain milik resep.
+- `avg_rating` bernilai `null` jika belum ada ulasan. Angka dikirim sebagai angka JSON dan `is_published` sebagai boolean.
+- `story` disertakan karena kartu frontend menampilkannya sebagai deskripsi. `image_path` bisa `null`.
+- `total` adalah jumlah seluruh hasil sebelum `limit`/`offset`. Hasil kosong tetap `200` dengan `"recipes": []`.
+- Waktu `created_at` mengikuti zona waktu database dan tidak diberi penanda zona.
+
+### Respons gagal
+
+| Status | Kondisi |
+|---|---|
+| `405` | Method selain GET |
+| `422` | Parameter bukan teks tunggal (mis. `q[]=x`), bukan UTF-8, terlalu panjang, di luar rentang, atau nilai `difficulty`/`sort` tidak dikenal |
+| `501` | `?id=...` (detail resep) — belum diimplementasikan, tahap 10B |
+| `500` | Kesalahan database/internal tanpa detail teknis |
+
+Contoh: `{"error":"Parameter sort harus popular, rating, newest, title, atau time."}`
+
+Detail resep (bahan, langkah, ulasan, status favorit) belum dibuat. Frontend tetap memakai fallback lokal untuk halaman detail ketika API gagal, sehingga tampilan detail belum membuktikan 10B berfungsi.
+
+### Pengujian manual
+
+Buka `http://localhost/FoodHub/backend/api/recipes.php` (atau tambahkan `?q=soto&category=Makanan%20Berat&sort=time`) dan pastikan respons berupa JSON. Pada `frontend/daftar-resep.html`, periksa Network → `recipes.php`; perhatikan bahwa **jika API gagal, halaman diam-diam memakai data lokal**, jadi status `200` pada tab Network adalah bukti yang valid, bukan tampilan kartu saja. Beranda juga memakai endpoint ini untuk 3 resep populer (`sort=popular&limit=3`).
+
 ## Pengujian otomatis
 
 Dari direktori utama proyek, jalankan:
@@ -541,6 +619,9 @@ Pengujian mencakup:
 - Keenam endpoint asli sudah dilindungi dan mencapai `501` hanya setelah izin/CSRF valid.
 - Promosi/demosi role langsung berlaku, input role/ID palsu tidak memberi akses, serta sesi akun terhapus ditolak.
 - CSRF stabil per sesi, rotasi saat autentikasi baru, penolakan token hilang/salah/sesi lain, dan logout gagal tidak mencabut autentikasi.
+- Daftar resep (10A): hanya resep tayang, field kartu, kategori array, rating/favorit dari database, pencarian judul/bahan tanpa duplikat, escape `%`/`_`, filter kategori/tingkat/waktu, kombinasi filter, semua urutan, limit/offset/total, validasi 422, method 405, dan `?id=` mengembalikan 501.
+
+**Pengujian daftar resep** membuat empat resep fixture (satu disembunyikan) lengkap dengan bahan, kategori, favorit, dan ulasan memakai slug berawalan `foodhub-test-`. Fixture dihapus pada blok `finally` melalui `ON DELETE CASCADE`; data resep awal tidak diubah. Jika proses dihentikan paksa, hapus resep berslug `foodhub-test-%` secara manual.
 
 **Pengujian autentikasi menulis ke database lokal:** script membuat dua akun dengan alamat email acak khusus pengujian, mengubah salah satu akun uji menjadi admin untuk memeriksa login berdasarkan role, lalu menghapus hanya akun uji tersebut dalam blok `finally`, termasuk ketika assertion gagal. Sesi pengujian menggunakan direktori sementara terpisah yang juga dibersihkan. Akun yang sudah ada tidak diubah. Gunakan database pengembangan, bukan database produksi. Jika proses dihentikan paksa sebelum cleanup berjalan, akun uji berawalan `foodhub-test-` dapat tertinggal dan harus diperiksa secara manual.
 
@@ -553,4 +634,4 @@ node --test frontend/tests/auth.test.js
 
 Tes Node memakai VM/mock DOM/fetch untuk memeriksa kontrak autentikasi, fail-closed, proteksi halaman, redirect, kegagalan logout, serta tidak adanya sumber autentikasi lokal. Tes PHP menggunakan HTTP dan database lokal nyata, termasuk token remember. Belum ada pengujian browser nyata yang terotomatisasi.
 
-Autentikasi nomor 8 dan fondasi otorisasi/CSRF nomor 9 selesai. Logika bisnis resep, profil, favorit, ulasan, dan admin belum diimplementasikan; endpoint terlindungi baru berupa guarded stub dengan status `501`.
+Autentikasi nomor 8, fondasi otorisasi/CSRF nomor 9, dan daftar resep nomor 10A selesai. Detail resep (10B), profil, favorit, ulasan, dan admin belum diimplementasikan; endpoint terlindungi baru berupa guarded stub dengan status `501`.

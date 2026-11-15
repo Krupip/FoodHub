@@ -998,7 +998,9 @@
           const params = new URLSearchParams();
           if (q) params.set('q', q);
           if (cat) params.set('category', cat);
-          if (w && w !== 999) params.set('max_time', w);
+          // 999 = "Lebih dari 60 menit": kirim batas bawah, bukan menghilangkan filter.
+          if (w === 999) params.set('min_time', 61);
+          else if (w) params.set('max_time', w);
           if (l) params.set('difficulty', l.toLowerCase());
           params.set('sort', 'popular');
 
