@@ -498,7 +498,7 @@ PHP;
         ['/protected/member', $adminCookie, $adminCsrf, $adminUser, 200],
         ['/protected/admin', $adminCookie, $adminCsrf, $adminUser, 200],
     ];
-    $stubPaths = array_diff(array_keys($guardedPaths), ['/api/profile.php', '/api/favorites.php', '/api/reviews.php', '/api/admin/recipes.php']);
+    $stubPaths = array_diff(array_keys($guardedPaths), ['/api/profile.php', '/api/favorites.php', '/api/reviews.php', '/api/admin/recipes.php', '/api/admin/users.php', '/api/admin/stats.php']);
     foreach ($stubPaths as $path) {
         if (str_starts_with($path, '/api/admin/')) {
             $allowedCases[] = [$path, $adminCookie, $adminCsrf, $adminUser, 501];
@@ -882,6 +882,18 @@ PHP;
                         } else {
                             expectError($roleAccess, 422, 'POST tanpa field resep ditolak 422 untuk admin sah: ' . $method);
                         }
+                    } elseif ($path === '/api/admin/users.php') {
+                        if ($method === 'GET') {
+                            expect($roleAccess['status'] === 200 && isset($roleAccess['body']['users']), 'Promosi langsung mengizinkan admin melihat pengguna: ' . $method);
+                        } else {
+                            expectError($roleAccess, 422, 'POST tanpa field pengguna ditolak 422 untuk admin sah: ' . $method);
+                        }
+                    } elseif ($path === '/api/admin/stats.php') {
+                        if ($method === 'GET') {
+                            expect($roleAccess['status'] === 200 && isset($roleAccess['body']['stats']), 'Promosi langsung mengizinkan admin melihat statistik: ' . $method);
+                        } else {
+                            expectError($roleAccess, 405, 'POST pada /api/admin/stats.php tidak diizinkan: ' . $method);
+                        }
                     } else {
                         expectError($roleAccess, 501, 'Promosi langsung mencapai stub admin asli: ' . $method . ' ' . $path);
                     }
@@ -890,7 +902,7 @@ PHP;
             }
         }
     }
-    $me = request($baseUrl, '/auth?action=me', 'GET', null, 'application/json', 'foodhub_session=' . binhex(random_bytes(16)));
+    $me = request($baseUrl, '/auth?action=me', 'GET', null, 'application/json', 'foodhub_session=' . bin2hex(random_bytes(16)));
 
 /* -------------------------------------------------
    TEST ADMIN USERS & STATS ENDPOINTS
@@ -941,6 +953,11 @@ expect(is_int($stats['total_recipes']), 'stats.total_recipes integer');
 expect(is_int($stats['published_recipes']), 'stats.published_recipes integer');
 expect(is_int($stats['hidden_recipes']), 'stats.hidden_recipes integer');
 expect(is_int($stats['total_users']), 'stats.total_users integer');
+
+// POST /api/admin/stats.php ditolak 405
+$statsPostRes = request($baseUrl, '/api/admin/stats.php', 'POST', '{}', 'application/json', $adminCookie, ['X-CSRF-Token' => $adminCsrf]);
+expectError($statsPostRes, 405, 'POST /api/admin/stats.php ditolak 405');
+expect(in_array('Allow: GET', $statsPostRes['headers'], true), 'Header Allow mencantumkan GET');
     expect($me['body'] === ['user' => null], 'ID sesi palsu tidak menjadi identitas pengguna.');
 
     foreach ([[], ['X-CSRF-Token' => 'false'], ['X-CSRF-Token' => str_repeat('0', 64)], ['X-CSRF-Token' => $registrationCsrf], ['X-CSRF-Token' => $adminCsrf]] as $csrfHeaders) {
