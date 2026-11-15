@@ -24,19 +24,40 @@ if ($requestMethod === 'GET') {
 if ($requestMethod === 'POST') {
     requireCsrfForMutation();
     $input = readJsonBody();
-    // Basic validation
-    if (!isset($input['name']) || !is_string($input['name']) || trim($input['name']) === '' ||
-        !isset($input['email']) || !is_string($input['email']) || !filter_var($input['email'], FILTER_VALIDATE_EMAIL) ||
-        !isset($input['password']) || !is_string($input['password']) || strlen($input['password']) < 8) {
-        sendErrorResponse('Data pengguna tidak valid.', 422);
+
+    $name = isset($input['name']) && is_string($input['name']) ? trim($input['name']) : '';
+    $email = isset($input['email']) && is_string($input['email']) ? strtolower(trim($input['email'])) : '';
+    $password = isset($input['password']) && is_string($input['password']) ? $input['password'] : '';
+
+    if (mb_strlen($name, 'UTF-8') < 3 || mb_strlen($name, 'UTF-8') > 100) {
+        sendErrorResponse('Nama harus terdiri dari 3 hingga 100 karakter.', 422);
     }
-    // Insert user (role forced to member)
+    if ($email === '' || strlen($email) > 254 || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        sendErrorResponse('Format email tidak valid.', 422);
+    }
+    if (strlen($password) < 8 || strlen($password) > 72) {
+        sendErrorResponse('Kata sandi harus terdiri dari 8 hingga 72 karakter.', 422);
+    }
+
+    // Periksa apakah email sudah terdaftar
+    $checkStmt = $pdo->prepare('SELECT id FROM users WHERE email = ?');
+    $checkStmt->execute([$email]);
+    if ($checkStmt->fetchColumn() !== false) {
+        sendErrorResponse('Email sudah terdaftar.', 409);
+    }
+
+    // Insert user (role selalu member)
     $stmt = $pdo->prepare('INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)');
-    $passwordHash = password_hash($input['password'], PASSWORD_DEFAULT);
-    $stmt->execute([trim($input['name']), trim($input['email']), $passwordHash, 'member']);
-    $newId = (int)$pdo->lastInsertId();
-    $user = ['id' => $newId, 'name' => trim($input['name']), 'email' => trim($input['email']), 'role' => 'member'];
-    sendJsonResponse(['user' => $user], 201);
+    $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+    $stmt->execute([$name, $email, $passwordHash, 'member']);
+    $newId = (int) $pdo->lastInsertId();
+    $createdUser = [
+        'id' => $newId,
+        'name' => $name,
+        'email' => $email,
+        'role' => 'member',
+    ];
+    sendJsonResponse(['user' => $createdUser], 201);
 }
 
 if ($requestMethod === 'DELETE') {

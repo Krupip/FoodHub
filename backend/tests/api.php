@@ -932,6 +932,31 @@ expect($postRes['status'] === 201, 'POST admin users harus 201');
 expect(isset($postRes['body']['user']['id']), 'POST mengembalikan id user baru');
 $newUserId = (int)$postRes['body']['user']['id'];
 
+// POST /api/admin/users.php duplikat email ditolak 409
+$dupRes = request(
+    $baseUrl,
+    '/api/admin/users.php',
+    'POST',
+    json_encode($newUserPayload, JSON_THROW_ON_ERROR),
+    'application/json',
+    $adminCookie,
+    ['X-CSRF-Token' => $adminCsrf]
+);
+expectError($dupRes, 409, 'POST admin users dengan email yang sudah ada ditolak 409');
+expect($dupRes['body']['error'] === 'Email sudah terdaftar.', 'Pesan error email duplikat sesuai');
+
+// Validasi data input pengguna admin (422)
+expectError(
+    request($baseUrl, '/api/admin/users.php', 'POST', json_encode(array_replace($newUserPayload, ['name' => 'ab']), JSON_THROW_ON_ERROR), 'application/json', $adminCookie, ['X-CSRF-Token' => $adminCsrf]),
+    422,
+    'POST admin users nama < 3 karakter ditolak 422'
+);
+expectError(
+    request($baseUrl, '/api/admin/users.php', 'POST', json_encode(array_replace($newUserPayload, ['email' => 'bukan-email']), JSON_THROW_ON_ERROR), 'application/json', $adminCookie, ['X-CSRF-Token' => $adminCsrf]),
+    422,
+    'POST admin users format email salah ditolak 422'
+);
+
 // DELETE /api/admin/users.php
 $deleteRes = request(
     $baseUrl,
