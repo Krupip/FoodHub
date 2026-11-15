@@ -498,7 +498,7 @@ PHP;
         ['/protected/member', $adminCookie, $adminCsrf, $adminUser, 200],
         ['/protected/admin', $adminCookie, $adminCsrf, $adminUser, 200],
     ];
-    $stubPaths = array_diff(array_keys($guardedPaths), ['/api/profile.php']);
+    $stubPaths = array_diff(array_keys($guardedPaths), ['/api/profile.php', '/api/favorites.php']);
     foreach ($stubPaths as $path) {
         if (str_starts_with($path, '/api/admin/')) {
             $allowedCases[] = [$path, $adminCookie, $adminCsrf, $adminUser, 501];
@@ -623,6 +623,65 @@ PHP;
     $restoreStmt = $testPdo->prepare('UPDATE users SET name = ? WHERE id = ?');
     $restoreStmt->execute([$user['name'], $user['id']]);
     echo '[OK] Endpoint /api/profile.php (GET, POST, PUT, PATCH) berhasil diuji secara komprehensif.', PHP_EOL;
+
+    // ---- Pengujian API Favorit (/api/favorites.php) ----
+    // 1. GET favorit awal (kosong)
+    $favRes = request($baseUrl, '/api/favorites.php', 'GET', null, 'application/json', $loginCookie);
+    expect($favRes['status'] === 200, 'GET /api/favorites.php mengembalikan status 200.');
+    expect(isset($favRes['body']['recipes']) && is_array($favRes['body']['recipes']), 'GET favorit mengembalikan array recipes.');
+    expect($favRes['body']['recipes'] === [] && $favRes['body']['total'] === 0, 'Daftar favorit awal akun baru adalah kosong.');
+    expect(responseCsrfToken($favRes) === $loginCsrf, 'GET favorit menerbitkan token CSRF yang stabil.');
+
+    // 2. Method tidak diizinkan
+    foreach (['PUT', 'PATCH'] as $badMethod) {
+        $badMethodRes = request($baseUrl, '/api/favorites.php', $badMethod, '{}', 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]);
+        expectError($badMethodRes, 405, $badMethod . ' /api/favorites.php ditolak.');
+        expect(in_array('Allow: GET, POST, DELETE', $badMethodRes['headers'], true), 'Header Allow mencantumkan GET, POST, DELETE.');
+    }
+
+    // 3. Validasi mutasi POST favorit
+    expectError(request($baseUrl, '/api/favorites.php', 'POST', '{"recipe_id":1}', 'application/json', $loginCookie), 403, 'POST favorit tanpa CSRF ditolak.');
+    expectError(request($baseUrl, '/api/favorites.php', 'POST', '{"recipe_id":1}', 'application/json', $loginCookie, ['X-CSRF-Token' => 'salah']), 403, 'POST favorit dengan CSRF salah ditolak.');
+    expectError(request($baseUrl, '/api/favorites.php', 'POST', 'recipe_id=1', 'application/x-www-form-urlencoded', $loginCookie, ['X-CSRF-Token' => $loginCsrf]), 415, 'POST favorit bukan JSON ditolak.');
+    expectError(request($baseUrl, '/api/favorites.php', 'POST', '{}', 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]), 422, 'POST favorit tanpa recipe_id ditolak.');
+    expectError(request($baseUrl, '/api/favorites.php', 'POST', '{"recipe_id":"abc"}', 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]), 422, 'POST favorit dengan recipe_id bukan angka ditolak.');
+    expectError(request($baseUrl, '/api/favorites.php', 'POST', '{"recipe_id":-1}', 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]), 422, 'POST favorit dengan recipe_id negatif ditolak.');
+    expectError(request($baseUrl, '/api/favorites.php', 'POST', '{"recipe_id":999999}', 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]), 404, 'POST favorit dengan resep tidak ada ditolak 404.');
+
+    // 4. POST favorit berhasil
+    $addFavRes = request($baseUrl, '/api/favorites.php', 'POST', '{"recipe_id":1}', 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]);
+    expect($addFavRes['status'] === 200 && $addFavRes['body']['is_favorite'] === true, 'POST /api/favorites.php berhasil menyimpan resep ke favorit.');
+    $stmt = $testPdo->prepare('SELECT 1 FROM favorites WHERE user_id = ? AND recipe_id = 1');
+    $stmt->execute([$user['id']]);
+    expect($stmt->fetchColumn() !== false, 'Relasi favorit tersimpan di database.');
+
+    // Idempoten jika dikirim ulang
+    $addAgainRes = request($baseUrl, '/api/favorites.php', 'POST', '{"recipe_id":1}', 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]);
+    expect($addAgainRes['status'] === 200 && $addAgainRes['body']['is_favorite'] === true, 'POST favorit idempoten untuk resep yang sudah disimpan.');
+
+    // 5. GET setelah ditambahkan
+    $favListAfter = request($baseUrl, '/api/favorites.php', 'GET', null, 'application/json', $loginCookie);
+    expect($favListAfter['status'] === 200 && count($favListAfter['body']['recipes']) === 1, 'GET favorit memuat 1 resep.');
+    $firstFav = $favListAfter['body']['recipes'][0];
+    expect($firstFav['id'] === 1 && $firstFav['title'] === 'Rendang Daging Sapi', 'Data resep favorit sesuai kartu resep.');
+    expect(is_array($firstFav['categories']) && in_array('Makanan Berat', $firstFav['categories'], true), 'Kategori resep berupa array.');
+    expect(is_string($firstFav['favorited_at']), 'Kolom favorited_at tersedia sebagai string.');
+
+    // 6. Validasi DELETE favorit
+    expectError(request($baseUrl, '/api/favorites.php?recipe_id=1', 'DELETE', null, 'application/json', $loginCookie), 403, 'DELETE favorit tanpa CSRF ditolak.');
+    expectError(request($baseUrl, '/api/favorites.php', 'DELETE', null, 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]), 422, 'DELETE favorit tanpa query recipe_id ditolak.');
+    expectError(request($baseUrl, '/api/favorites.php?recipe_id=abc', 'DELETE', null, 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]), 422, 'DELETE favorit dengan recipe_id invalid ditolak.');
+
+    // 7. DELETE favorit berhasil
+    $delFavRes = request($baseUrl, '/api/favorites.php?recipe_id=1', 'DELETE', null, 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]);
+    expect($delFavRes['status'] === 200 && $delFavRes['body']['is_favorite'] === false, 'DELETE favorit berhasil menghapus resep.');
+    $stmt->execute([$user['id']]);
+    expect($stmt->fetchColumn() === false, 'Relasi favorit di database benar-benar terhapus.');
+
+    // 8. GET setelah dihapus kembali kosong
+    $favListEmpty = request($baseUrl, '/api/favorites.php', 'GET', null, 'application/json', $loginCookie);
+    expect($favListEmpty['body']['recipes'] === [] && $favListEmpty['body']['total'] === 0, 'Daftar favorit kembali kosong setelah dihapus.');
+    echo '[OK] Endpoint /api/favorites.php (GET, POST, DELETE) berhasil diuji secara komprehensif.', PHP_EOL;
 
     $switchLogin = request($baseUrl, '/auth?action=login', 'POST', json_encode($login, JSON_THROW_ON_ERROR));
     expect($switchLogin['status'] === 200 && $switchLogin['body'] === ['user' => $user], 'Login publik untuk uji pergantian akun tidak membutuhkan CSRF.');

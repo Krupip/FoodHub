@@ -754,6 +754,106 @@ Aturan validasi:
 | `422` | `name` tidak ada, bukan string, kurang dari 3 karakter, atau lebih dari 100 karakter |
 | `500` | Kesalahan internal server / koneksi database |
 
+## API favorit resep — 12
+
+### 1. Membaca daftar resep favorit
+
+```http
+GET /FoodHub/backend/api/favorites.php
+```
+
+Endpoint terlindungi (`requireLogin()`). Mengembalikan kartu resep yang disimpan oleh pengguna aktif yang masih berstatus tayang (`is_published = 1`).
+
+#### Respons berhasil — 200
+
+```json
+{
+  "recipes": [
+    {
+      "id": 1,
+      "title": "Rendang Daging Sapi",
+      "slug": "rendang-daging-sapi",
+      "region": "Sumatera Barat",
+      "story": "Olahan daging sapi empuk ...",
+      "image_path": "img/rendang.jpg",
+      "cook_time_minutes": 180,
+      "difficulty": "sulit",
+      "servings": 6,
+      "is_published": true,
+      "created_at": "2026-08-05 08:00:00",
+      "avg_rating": 5.0,
+      "review_count": 2,
+      "favorite_count": 1,
+      "favorited_at": "2026-11-15 21:00:00",
+      "categories": ["Makanan Berat"]
+    }
+  ],
+  "total": 1
+}
+```
+
+Jika pengguna belum memiliki resep favorit, respons mengembalikan `{"recipes": [], "total": 0}` dengan status `200`.
+
+### 2. Menyimpan resep ke favorit
+
+```http
+POST /FoodHub/backend/api/favorites.php
+Content-Type: application/json
+X-CSRF-Token: <token_csrf_sesi>
+```
+
+Contoh body:
+
+```json
+{
+  "recipe_id": 1
+}
+```
+
+- Parameter `recipe_id` wajib berupa bilangan bulat positif `1–4294967295`.
+- Resep harus ada dan berstatus tayang (`is_published = 1`), jika tidak endpoint mengembalikan `404`.
+- Operasi bersifat idempoten menggunakan `INSERT IGNORE`.
+
+#### Respons berhasil — 200
+
+```json
+{
+  "message": "Resep berhasil disimpan ke favorit.",
+  "is_favorite": true
+}
+```
+
+### 3. Menghapus resep dari favorit
+
+```http
+DELETE /FoodHub/backend/api/favorites.php?recipe_id=1
+X-CSRF-Token: <token_csrf_sesi>
+```
+
+- Parameter `recipe_id` dikirimkan melalui URL query string sebagai bilangan bulat positif.
+- Menghapus relasi favorit untuk pengguna yang sedang login.
+
+#### Respons berhasil — 200
+
+```json
+{
+  "message": "Resep berhasil dihapus dari favorit.",
+  "is_favorite": false
+}
+```
+
+#### Respons gagal
+
+| Status | Kondisi |
+|---|---|
+| `401` | Belum masuk / sesi tidak sah |
+| `403` | Header `X-CSRF-Token` hilang atau tidak cocok |
+| `404` | Resep yang ingin difavoritkan tidak ditemukan atau disembunyikan |
+| `405` | Method selain GET, POST, DELETE (mis. PUT, PATCH) |
+| `415` | Content-Type bukan `application/json` pada POST |
+| `422` | Parameter `recipe_id` tidak ada, bukan integer, atau tidak valid |
+| `500` | Kesalahan internal server / basis data |
+
 ## Pengujian otomatis
 
 Dari direktori utama proyek, jalankan:
@@ -808,5 +908,6 @@ node --test frontend/tests/auth.test.js
 Tes Node memakai VM/mock DOM/fetch untuk memeriksa kontrak autentikasi, fail-closed, proteksi halaman, redirect, kegagalan logout, serta tidak adanya sumber autentikasi lokal. Regresi detail memeriksa tampilan data API, rating null, kegagalan API tanpa fallback demo, respons tidak lengkap, dan URL tanpa ID. Tes PHP menggunakan HTTP dan database lokal nyata, termasuk token remember. Belum ada pengujian browser nyata yang terotomatisasi.
 
 - Profil pengguna (11): membaca profil akun lengkap dari database, validasi nama 3–100 karakter dan bio opsional, penolakan manipulasi role/id/email, proteksi CSRF pada POST/PUT/PATCH, method DELETE ditolak 405.
+- Resep favorit (12): membaca daftar resep favorit terurut terbaru, menambah favorit dengan validasi status publikasi resep, menghapus favorit, proteksi CSRF pada POST/DELETE, method selain GET/POST/DELETE ditolak 405.
 
-Autentikasi nomor 8, fondasi otorisasi/CSRF nomor 9, daftar resep 10A, detail resep 10B, dan API profil pengguna (11) selesai. Pengelolaan favorit/ulasan dan admin belum diimplementasikan; endpoint terlindungi tersebut baru berupa guarded stub dengan status `501`.
+Autentikasi nomor 8, fondasi otorisasi/CSRF nomor 9, daftar resep 10A, detail resep 10B, API profil pengguna (11), dan API favorit resep (12) selesai. Pengelolaan ulasan dan admin belum diimplementasikan; endpoint terlindungi tersebut baru berupa guarded stub dengan status `501`.
