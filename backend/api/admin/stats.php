@@ -1,7 +1,9 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__.'/../../includes/bootstrap.php';
+require_once __DIR__ . '/../../includes/bootstrap.php';
+
+$user = requireAdmin();
 
 $requestMethod = $_SERVER['REQUEST_METHOD'] ?? '';
 if ($requestMethod !== 'GET') {
@@ -9,7 +11,6 @@ if ($requestMethod !== 'GET') {
     sendErrorResponse('Metode HTTP tidak diizinkan.', 405);
 }
 
-$user = requireAdmin(); // ensure admin
 $pdo = getDatabaseConnection();
 
 // Gather statistics

@@ -3,13 +3,14 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/bootstrap.php';
 
+$user = requireAdmin();
+
 $requestMethod = $_SERVER['REQUEST_METHOD'] ?? '';
 if (!in_array($requestMethod, ['GET', 'POST', 'DELETE'], true)) {
     header('Allow: GET, POST, DELETE');
     sendErrorResponse('Metode HTTP tidak diizinkan.', 405);
 }
 
-$user = requireAdmin();
 $pdo = getDatabaseConnection();
 
 if ($requestMethod === 'GET') {
@@ -36,14 +37,6 @@ if ($requestMethod === 'POST') {
     $newId = (int)$pdo->lastInsertId();
     $user = ['id' => $newId, 'name' => trim($input['name']), 'email' => trim($input['email']), 'role' => 'member'];
     sendJsonResponse(['user' => $user], 201);
-}
-
-if ($requestMethod === 'DELETE') {
-    // Return list of all users
-    $stmt = $pdo->prepare('SELECT id, name, email, role, created_at FROM users ORDER BY id ASC');
-    $stmt->execute();
-    $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    sendJsonResponse(['users' => $users]);
 }
 
 if ($requestMethod === 'DELETE') {
