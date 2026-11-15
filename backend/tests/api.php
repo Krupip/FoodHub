@@ -498,7 +498,8 @@ PHP;
         ['/protected/member', $adminCookie, $adminCsrf, $adminUser, 200],
         ['/protected/admin', $adminCookie, $adminCsrf, $adminUser, 200],
     ];
-    foreach (array_keys($guardedPaths) as $path) {
+    $stubPaths = array_diff(array_keys($guardedPaths), ['/api/profile.php']);
+    foreach ($stubPaths as $path) {
         if (str_starts_with($path, '/api/admin/')) {
             $allowedCases[] = [$path, $adminCookie, $adminCsrf, $adminUser, 501];
         } else {
@@ -557,6 +558,71 @@ PHP;
     expect($guardUsers->fetchAll() === $usersBeforeGuards, 'Semua request guard/stub tidak mengubah identitas, role, atau hash password kedua akun uji.');
     $guardTokens->execute([$user['id'], $adminId]);
     expect($guardTokens->fetchAll() === $tokensBeforeGuards, 'Request guard/stub termasuk CSRF invalid tidak mencabut atau mengubah hash remember.');
+
+    // ---- Pengujian API Profil (/api/profile.php) ----
+    // 1. GET profil member
+    $profileRes = request($baseUrl, '/api/profile.php', 'GET', null, 'application/json', $loginCookie);
+    expect($profileRes['status'] === 200, 'GET /api/profile.php mengembalikan status 200.');
+    expect(isset($profileRes['body']['user']) && is_array($profileRes['body']['user']), 'GET profil memiliki objek user.');
+    $profileData = $profileRes['body']['user'];
+    expect($profileData['id'] === $user['id'], 'ID profil sesuai akun sesi.');
+    expect($profileData['name'] === $user['name'], 'Nama profil sesuai akun sesi.');
+    expect($profileData['email'] === $user['email'], 'Email profil sesuai akun sesi.');
+    expect($profileData['role'] === 'member', 'Role profil sesuai akun sesi.');
+    expect(is_string($profileData['created_at']) && strlen($profileData['created_at']) > 0, 'Waktu created_at berupa string valid.');
+    expect(!array_key_exists('password_hash', $profileData), 'GET profil tidak mengekspos hash kata sandi.');
+    expect(responseCsrfToken($profileRes) === $loginCsrf, 'GET profil menerbitkan token CSRF yang stabil.');
+
+    // 2. GET profil admin
+    $adminProfileRes = request($baseUrl, '/api/profile.php', 'GET', null, 'application/json', $adminCookie);
+    expect($adminProfileRes['status'] === 200 && $adminProfileRes['body']['user']['role'] === 'admin', 'GET profil admin mengembalikan role admin.');
+
+    // 3. Method tidak diizinkan
+    $invalidMethodRes = request($baseUrl, '/api/profile.php', 'DELETE', null, 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]);
+    expectError($invalidMethodRes, 405, 'DELETE /api/profile.php ditolak.');
+    expect(in_array('Allow: GET, POST, PUT, PATCH', $invalidMethodRes['headers'], true), 'Header Allow mencantumkan GET, POST, PUT, PATCH.');
+
+    // 4. Validasi mutasi POST tanpa CSRF atau CSRF salah
+    expectError(request($baseUrl, '/api/profile.php', 'POST', '{"name":"Baru"}', 'application/json', $loginCookie), 403, 'POST profil tanpa header CSRF ditolak.');
+    expectError(request($baseUrl, '/api/profile.php', 'POST', '{"name":"Baru"}', 'application/json', $loginCookie, ['X-CSRF-Token' => 'salah']), 403, 'POST profil dengan CSRF salah ditolak.');
+
+    // 5. Validasi tipe konten dan body
+    expectError(request($baseUrl, '/api/profile.php', 'POST', 'name=Baru', 'application/x-www-form-urlencoded', $loginCookie, ['X-CSRF-Token' => $loginCsrf]), 415, 'Content-Type bukan JSON ditolak.');
+    expectError(request($baseUrl, '/api/profile.php', 'POST', '{}', 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]), 422, 'POST profil tanpa field name ditolak.');
+    expectError(request($baseUrl, '/api/profile.php', 'POST', '{"name": 123}', 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]), 422, 'POST profil dengan name bukan teks ditolak.');
+    expectError(request($baseUrl, '/api/profile.php', 'POST', '{"name": "  ab  "}', 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]), 422, 'POST profil dengan name kurang dari 3 karakter ditolak.');
+    expectError(request($baseUrl, '/api/profile.php', 'POST', json_encode(['name' => str_repeat('a', 101)]), 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]), 422, 'POST profil dengan name melebihi 100 karakter ditolak.');
+
+    // 6. Mutasi berhasil (POST)
+    $newName = 'Nama Baru ' . bin2hex(random_bytes(4));
+    $updateRes = request($baseUrl, '/api/profile.php', 'POST', json_encode(['name' => $newName]), 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]);
+    expect($updateRes['status'] === 200, 'POST pembaruan profil berhasil dengan status 200.');
+    expect($updateRes['body']['user']['name'] === $newName, 'Respons mengembalikan nama yang baru diperbarui.');
+    expect($updateRes['body']['user']['email'] === $user['email'], 'Email pengguna tidak berubah.');
+    expect($updateRes['body']['user']['role'] === 'member', 'Role pengguna tidak berubah.');
+    $stmt = $testPdo->prepare('SELECT name FROM users WHERE id = ?');
+    $stmt->execute([$user['id']]);
+    expect($stmt->fetchColumn() === $newName, 'Nama pengguna di database benar-benar terupdate.');
+
+    // 7. Percobaan pemalsuan field terlindungi (role, id, email) diabaikan
+    $tamperedPayload = json_encode(['name' => 'Nama Tetap Sah', 'role' => 'admin', 'id' => 9999, 'email' => 'hacker@evil.com']);
+    $tamperRes = request($baseUrl, '/api/profile.php', 'POST', $tamperedPayload, 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]);
+    expect($tamperRes['status'] === 200, 'Request dengan field tambahan terlindungi tetap diproses dengan aman.');
+    expect($tamperRes['body']['user']['name'] === 'Nama Tetap Sah', 'Nama diperbarui.');
+    expect($tamperRes['body']['user']['role'] === 'member', 'Role tetap member, tidak berubah jadi admin.');
+    expect($tamperRes['body']['user']['id'] === $user['id'], 'ID tetap milik akun sesi.');
+    expect($tamperRes['body']['user']['email'] === $user['email'], 'Email tetap milik akun sesi.');
+
+    // 8. Dukungan method PUT dan PATCH
+    $putRes = request($baseUrl, '/api/profile.php', 'PUT', json_encode(['name' => 'Nama Via PUT']), 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]);
+    expect($putRes['status'] === 200 && $putRes['body']['user']['name'] === 'Nama Via PUT', 'PUT /api/profile.php berhasil memperbarui nama.');
+    $patchRes = request($baseUrl, '/api/profile.php', 'PATCH', json_encode(['name' => 'Nama Via PATCH']), 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]);
+    expect($patchRes['status'] === 200 && $patchRes['body']['user']['name'] === 'Nama Via PATCH', 'PATCH /api/profile.php berhasil memperbarui nama.');
+
+    // Kembalikan nama akun uji ke semula agar pengujian lanjutan tetap sinkron
+    $restoreStmt = $testPdo->prepare('UPDATE users SET name = ? WHERE id = ?');
+    $restoreStmt->execute([$user['name'], $user['id']]);
+    echo '[OK] Endpoint /api/profile.php (GET, POST, PUT, PATCH) berhasil diuji secara komprehensif.', PHP_EOL;
 
     $switchLogin = request($baseUrl, '/auth?action=login', 'POST', json_encode($login, JSON_THROW_ON_ERROR));
     expect($switchLogin['status'] === 200 && $switchLogin['body'] === ['user' => $user], 'Login publik untuk uji pergantian akun tidak membutuhkan CSRF.');

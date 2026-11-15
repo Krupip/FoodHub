@@ -663,7 +663,96 @@ Takaran dikirim sebagai angka dasar untuk `servings`; frontend menghitung `quant
 4. Coba `?id=abc` pada API (`422`) dan ID resep tersembunyi/tidak ada (`404`). Halaman detail tidak lagi memakai fallback resep demo; kegagalan jaringan/server menampilkan pesan gagal memuat, bukan data lokal.
 5. Jika sudah memiliki data favorit di database, bandingkan `is_favorite` sebelum dan setelah login dengan akun pemiliknya.
 
-**Batas tahap ini:** membaca ulasan dan status favorit sudah tersedia. Menambah/menghapus favorit serta menulis ulasan tetap tahap 11; endpoint mutasinya masih `501` setelah lolos guard/CSRF. Daftar resep/beranda masih memiliki fallback lokal yang terpisah; perubahan 10B hanya menghapus fallback pada detail.
+**Batas tahap ini:** membaca ulasan dan status favorit sudah tersedia. Menambah/menghapus favorit serta menulis ulasan tetap tahap berikutnya; endpoint mutasinya masih `501` setelah lolos guard/CSRF. Daftar resep/beranda masih memiliki fallback lokal yang terpisah; perubahan 10B hanya menghapus fallback pada detail.
+
+## API profil pengguna — 11
+
+### 1. Membaca profil pengguna
+
+```http
+GET /FoodHub/backend/api/profile.php
+```
+
+Endpoint terlindungi: mensyaratkan login aktif (`requireLogin()`). Pengunjung anonim ditolak `401`.
+
+#### Respons berhasil — 200
+
+```json
+{
+  "user": {
+    "id": 2,
+    "name": "Raka Pratama",
+    "email": "raka@contoh.id",
+    "role": "member",
+    "avatar_path": null,
+    "bio": null,
+    "created_at": "2026-09-12 10:00:00",
+    "updated_at": null
+  }
+}
+```
+
+- Data selalu dibaca dari tabel `users` berdasarkan identitas sesi server.
+- `id` berupa integer JSON, `password_hash` tidak pernah disertakan.
+- Header `X-CSRF-Token` diterbitkan secara stabil selama sesi berlangsung.
+
+### 2. Memperbarui profil pengguna
+
+```http
+POST /FoodHub/backend/api/profile.php
+Content-Type: application/json
+X-CSRF-Token: <token_csrf_sesi>
+```
+
+Mendukung method `POST`, `PUT`, dan `PATCH`. Mutasi memerlukan header `X-CSRF-Token` yang sah dan tipe konten `application/json`.
+
+Contoh body:
+
+```json
+{
+  "name": "Raka P. Perkasa",
+  "bio": "Pecinta masakan pedas Nusantara."
+}
+```
+
+Aturan validasi:
+
+| Field | Tipe | Aturan |
+|---|---|---|
+| `name` | String | Wajib. Spasi di awal/akhir dipotong. Panjang 3–100 karakter Unicode. |
+| `bio` | String / Null | Opsional. Maksimal 255 karakter Unicode. |
+
+- Parameter lain seperti `id`, `email`, `role`, dan `password_hash` diabaikan sehingga pengguna tidak dapat memanipulasi hak akses atau identitasnya.
+- Waktu `updated_at` diperbarui otomatis oleh database.
+
+#### Respons berhasil — 200
+
+```json
+{
+  "message": "Perubahan profil berhasil disimpan.",
+  "user": {
+    "id": 2,
+    "name": "Raka P. Perkasa",
+    "email": "raka@contoh.id",
+    "role": "member",
+    "avatar_path": null,
+    "bio": "Pecinta masakan pedas Nusantara.",
+    "created_at": "2026-09-12 10:00:00",
+    "updated_at": "2026-11-15 21:05:00"
+  }
+}
+```
+
+#### Respons gagal
+
+| Status | Kondisi |
+|---|---|
+| `401` | Belum masuk / sesi kedaluwarsa |
+| `403` | Header `X-CSRF-Token` hilang, tidak cocok dengan sesi, atau format salah |
+| `405` | Method selain GET, POST, PUT, PATCH (mis. DELETE) |
+| `415` | Content-Type bukan `application/json` pada mutasi |
+| `422` | `name` tidak ada, bukan string, kurang dari 3 karakter, atau lebih dari 100 karakter |
+| `500` | Kesalahan internal server / koneksi database |
 
 ## Pengujian otomatis
 
@@ -718,4 +807,6 @@ node --test frontend/tests/auth.test.js
 
 Tes Node memakai VM/mock DOM/fetch untuk memeriksa kontrak autentikasi, fail-closed, proteksi halaman, redirect, kegagalan logout, serta tidak adanya sumber autentikasi lokal. Regresi detail memeriksa tampilan data API, rating null, kegagalan API tanpa fallback demo, respons tidak lengkap, dan URL tanpa ID. Tes PHP menggunakan HTTP dan database lokal nyata, termasuk token remember. Belum ada pengujian browser nyata yang terotomatisasi.
 
-Autentikasi nomor 8, fondasi otorisasi/CSRF nomor 9, daftar resep 10A, dan detail resep 10B selesai. Profil, pengelolaan favorit/ulasan, dan admin belum diimplementasikan; endpoint terlindungi tersebut baru berupa guarded stub dengan status `501`.
+- Profil pengguna (11): membaca profil akun lengkap dari database, validasi nama 3–100 karakter dan bio opsional, penolakan manipulasi role/id/email, proteksi CSRF pada POST/PUT/PATCH, method DELETE ditolak 405.
+
+Autentikasi nomor 8, fondasi otorisasi/CSRF nomor 9, daftar resep 10A, detail resep 10B, dan API profil pengguna (11) selesai. Pengelolaan favorit/ulasan dan admin belum diimplementasikan; endpoint terlindungi tersebut baru berupa guarded stub dengan status `501`.
