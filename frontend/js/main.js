@@ -1184,13 +1184,16 @@
       let r = null;
       try {
         const res = await api('recipes.php?id=' + encodeURIComponent(id));
-        r = res.recipe;
+        r = res && res.recipe;
+        if (!r || typeof r.title !== 'string' || !Array.isArray(r.categories) ||
+            !Array.isArray(r.ingredients) || !Array.isArray(r.steps) || !Array.isArray(r.reviews)) {
+          throw new Error('Respons detail resep tidak valid.');
+        }
       } catch (e) {
-        r = byId(id);
-      }
-
-      if (!r) {
-        box.innerHTML = '<div class="empty"><h2>Resep tidak ditemukan</h2><a class="btn" href="daftar-resep.html">Lihat semua resep</a></div>';
+        const notFound = e.status === 404 || e.status === 422;
+        box.innerHTML = `<div class="empty"><h2>${notFound ? 'Resep tidak ditemukan' : 'Gagal memuat resep'}</h2>
+          ${notFound ? '' : '<p>Pastikan backend tersedia, lalu muat ulang halaman.</p>'}
+          <a class="btn" href="daftar-resep.html">Lihat semua resep</a></div>`;
         return;
       }
 
@@ -1226,7 +1229,7 @@
               <div class="tile"><b>${cookTime} mnt</b><span>Waktu</span></div>
               <div class="tile"><b>${esc(diff)}</b><span>Tingkat</span></div>
               <div class="tile"><b id="pt">${sv_}</b><span>Porsi</span></div>
-              <div class="tile"><b id="rt">★ ${r.avg_rating != null ? Number(r.avg_rating).toFixed(1) : (rat(r)?.a.toFixed(1) || '-')}</b><span>Rating</span></div>
+              <div class="tile"><b id="rt">★ ${r.avg_rating != null ? Number(r.avg_rating).toFixed(1) : '-'}</b><span>Rating</span></div>
             </div>
             <div class="chips">
               <button class="btn" id="fv" type="button">

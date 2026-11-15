@@ -571,16 +571,99 @@ Frontend mengirim `min_time=61` untuk opsi **Lebih dari 60 menit**. Sebelumnya o
 |---|---|
 | `405` | Method selain GET |
 | `422` | Parameter bukan teks tunggal (mis. `q[]=x`), bukan UTF-8, terlalu panjang, di luar rentang, atau nilai `difficulty`/`sort` tidak dikenal |
-| `501` | `?id=...` (detail resep) — belum diimplementasikan, tahap 10B |
+
 | `500` | Kesalahan database/internal tanpa detail teknis |
 
 Contoh: `{"error":"Parameter sort harus popular, rating, newest, title, atau time."}`
 
-Detail resep (bahan, langkah, ulasan, status favorit) belum dibuat. Frontend tetap memakai fallback lokal untuk halaman detail ketika API gagal, sehingga tampilan detail belum membuktikan 10B berfungsi.
 
 ### Pengujian manual
 
 Buka `http://localhost/FoodHub/backend/api/recipes.php` (atau tambahkan `?q=soto&category=Makanan%20Berat&sort=time`) dan pastikan respons berupa JSON. Pada `frontend/daftar-resep.html`, periksa Network → `recipes.php`; perhatikan bahwa **jika API gagal, halaman diam-diam memakai data lokal**, jadi status `200` pada tab Network adalah bukti yang valid, bukan tampilan kartu saja. Beranda juga memakai endpoint ini untuk 3 resep populer (`sort=popular&limit=3`).
+
+## API detail resep — 10B
+
+### Request
+
+```http
+GET /FoodHub/backend/api/recipes.php?id=1
+```
+
+Endpoint ini **publik**, sehingga tidak perlu login. Jika query memiliki key `id`, endpoint memilih detail, bukan daftar; parameter daftar seperti `q`, `sort`, dan `limit` diabaikan.
+
+- `id` wajib berupa bilangan bulat `1–4294967295` (rentang ID tabel `INT UNSIGNED`). Nilai kosong, array, pecahan, negatif, teks, atau di luar rentang menghasilkan `422`.
+- Hanya resep `is_published = 1` yang tersedia. Resep tersembunyi dan ID yang tidak ditemukan sama-sama menghasilkan `404`, termasuk jika pembaca adalah admin. Pratinjau resep admin bukan bagian endpoint publik ini.
+- Query database menggunakan prepared statement.
+
+### Respons berhasil — 200
+
+Respons berupa `{"recipe": {...}}`, bukan array `recipes`. Objek resep memuat **seluruh field kartu pada 10A**, ditambah:
+
+| Field | Bentuk dan arti |
+|---|---|
+| `author` | Nama pembuat dari tabel users; `Tim FoodHub` jika tidak ada pembuat |
+| `ingredients` | Array objek `{name, quantity, unit}`, sesuai urutan `sort_order`, lalu ID |
+| `steps` | Array teks instruksi sesuai `step_number` |
+| `reviews` | Array objek `{user_name, rating, comment, created_at}`, terbaru dahulu; ID menurun jika waktunya sama |
+| `is_favorite` | Boolean apakah pengguna yang sedang login menyimpan resep tersebut |
+
+Contoh bentuk respons (data ilustrasi, ID dan nilainya dapat berbeda):
+
+```json
+{
+  "recipe": {
+    "id": 1,
+    "title": "Resep Contoh",
+    "slug": "resep-contoh",
+    "region": "Jawa Tengah",
+    "story": "Cerita di balik resep.",
+    "image_path": null,
+    "cook_time_minutes": 30,
+    "difficulty": "mudah",
+    "servings": 2,
+    "is_published": true,
+    "created_at": "2026-11-15 08:00:00",
+    "avg_rating": 4.5,
+    "review_count": 2,
+    "favorite_count": 1,
+    "categories": ["Cepat"],
+    "author": "Tim FoodHub",
+    "ingredients": [
+      {"name": "Beras", "quantity": 250, "unit": "g"},
+      {"name": "Garam", "quantity": null, "unit": null}
+    ],
+    "steps": ["Siapkan bahan.", "Masak hingga matang."],
+    "reviews": [
+      {"user_name": "Nadia", "rating": 4, "comment": "Enak", "created_at": "2026-11-15 10:00:00"},
+      {"user_name": "Raka", "rating": 5, "comment": "Mantap", "created_at": "2026-11-15 09:00:00"}
+    ],
+    "is_favorite": false
+  }
+}
+```
+
+Takaran dikirim sebagai angka dasar untuk `servings`; frontend menghitung `quantity × porsi_baru / servings`. `quantity: null` berarti secukupnya. Relasi kosong tetap berupa `[]`; rating tanpa ulasan berupa `null`. Email, hash password, dan token autentikasi tidak dimasukkan ke JSON detail maupun ulasan.
+
+**Status favorit:** tanpa cookie, endpoint tidak membuat sesi dan selalu mengirim `false`. Jika ada cookie sesi/remember, backend memvalidasi identitas lewat helper autentikasi yang sama dengan `me`; cookie tidak sah/akun terhapus diperlakukan sebagai tamu, bukan menolak detail publik. Remember valid dapat memulihkan sesi dan merotasi cookie. Respons terautentikasi menerbitkan header `X-CSRF-Token`; GET detail tidak memerlukan header CSRF dari klien. Parameter `user_id`/`role` dari query tidak dipercaya. Respons memakai `Cache-Control: no-store` agar status favorit tidak tersimpan dalam cache.
+
+### Respons gagal
+
+| Status | Kondisi |
+|---|---|
+| `404` | Resep tidak ada atau disembunyikan; `{"error":"Resep tidak ditemukan."}` |
+| `405` | Method selain GET, dengan header `Allow: GET` |
+| `422` | Parameter `id` kosong atau tidak valid |
+| `500` | Kesalahan internal/database, tanpa detail teknis |
+
+### Pengujian manual
+
+1. Buka `http://localhost/FoodHub/backend/api/recipes.php?id=1` dan periksa objek `recipe`, bahan, langkah, kategori, serta ulasannya.
+2. Buka `http://localhost/FoodHub/frontend/detail-resep.html?id=1` pada origin yang sama. Periksa Network → `recipes.php?id=1` berstatus `200`.
+3. Ubah porsi pada halaman detail; takaran angka berubah, sementara bahan secukupnya tetap secukupnya.
+4. Coba `?id=abc` pada API (`422`) dan ID resep tersembunyi/tidak ada (`404`). Halaman detail tidak lagi memakai fallback resep demo; kegagalan jaringan/server menampilkan pesan gagal memuat, bukan data lokal.
+5. Jika sudah memiliki data favorit di database, bandingkan `is_favorite` sebelum dan setelah login dengan akun pemiliknya.
+
+**Batas tahap ini:** membaca ulasan dan status favorit sudah tersedia. Menambah/menghapus favorit serta menulis ulasan tetap tahap 11; endpoint mutasinya masih `501` setelah lolos guard/CSRF. Daftar resep/beranda masih memiliki fallback lokal yang terpisah; perubahan 10B hanya menghapus fallback pada detail.
 
 ## Pengujian otomatis
 
@@ -619,9 +702,10 @@ Pengujian mencakup:
 - Keenam endpoint asli sudah dilindungi dan mencapai `501` hanya setelah izin/CSRF valid.
 - Promosi/demosi role langsung berlaku, input role/ID palsu tidak memberi akses, serta sesi akun terhapus ditolak.
 - CSRF stabil per sesi, rotasi saat autentikasi baru, penolakan token hilang/salah/sesi lain, dan logout gagal tidak mencabut autentikasi.
-- Daftar resep (10A): hanya resep tayang, field kartu, kategori array, rating/favorit dari database, pencarian judul/bahan tanpa duplikat, escape `%`/`_`, filter kategori/tingkat/waktu, kombinasi filter, semua urutan, limit/offset/total, validasi 422, method 405, dan `?id=` mengembalikan 501.
+- Daftar resep (10A): hanya resep tayang, field kartu, kategori array, rating/favorit dari database, pencarian judul/bahan tanpa duplikat, escape `%`/`_`, filter kategori/tingkat/waktu, kombinasi filter, semua urutan, limit/offset/total, validasi 422, dan method 405.
+- Detail resep (10B): konsistensi field dengan daftar, penulis, urutan bahan/langkah/ulasan, takaran pecahan/null, array kosong, privasi kolom akun, status favorit per pengguna, ID palsu/invalid, resep tersembunyi bahkan untuk admin, resep dihapus, cookie invalid/akun terhapus sebagai tamu, pemulihan remember/rotasi/replay, logout, serta tidak ada cookie/CSRF anonim.
 
-**Pengujian daftar resep** membuat empat resep fixture (satu disembunyikan) lengkap dengan bahan, kategori, favorit, dan ulasan memakai slug berawalan `foodhub-test-`. Fixture dihapus pada blok `finally` melalui `ON DELETE CASCADE`; data resep awal tidak diubah. Jika proses dihentikan paksa, hapus resep berslug `foodhub-test-%` secara manual.
+**Pengujian daftar dan detail resep** membuat empat resep fixture (satu disembunyikan) lengkap dengan bahan, langkah, kategori, favorit, dan ulasan memakai slug berawalan `foodhub-test-`. Fixture dihapus pada blok `finally` melalui `ON DELETE CASCADE`; data resep awal tidak diubah. Jika proses dihentikan paksa, hapus resep berslug `foodhub-test-%` secara manual.
 
 **Pengujian autentikasi menulis ke database lokal:** script membuat dua akun dengan alamat email acak khusus pengujian, mengubah salah satu akun uji menjadi admin untuk memeriksa login berdasarkan role, lalu menghapus hanya akun uji tersebut dalam blok `finally`, termasuk ketika assertion gagal. Sesi pengujian menggunakan direktori sementara terpisah yang juga dibersihkan. Akun yang sudah ada tidak diubah. Gunakan database pengembangan, bukan database produksi. Jika proses dihentikan paksa sebelum cleanup berjalan, akun uji berawalan `foodhub-test-` dapat tertinggal dan harus diperiksa secara manual.
 
@@ -632,6 +716,6 @@ node --check frontend/js/main.js
 node --test frontend/tests/auth.test.js
 ```
 
-Tes Node memakai VM/mock DOM/fetch untuk memeriksa kontrak autentikasi, fail-closed, proteksi halaman, redirect, kegagalan logout, serta tidak adanya sumber autentikasi lokal. Tes PHP menggunakan HTTP dan database lokal nyata, termasuk token remember. Belum ada pengujian browser nyata yang terotomatisasi.
+Tes Node memakai VM/mock DOM/fetch untuk memeriksa kontrak autentikasi, fail-closed, proteksi halaman, redirect, kegagalan logout, serta tidak adanya sumber autentikasi lokal. Regresi detail memeriksa tampilan data API, rating null, kegagalan API tanpa fallback demo, respons tidak lengkap, dan URL tanpa ID. Tes PHP menggunakan HTTP dan database lokal nyata, termasuk token remember. Belum ada pengujian browser nyata yang terotomatisasi.
 
-Autentikasi nomor 8, fondasi otorisasi/CSRF nomor 9, dan daftar resep nomor 10A selesai. Detail resep (10B), profil, favorit, ulasan, dan admin belum diimplementasikan; endpoint terlindungi baru berupa guarded stub dengan status `501`.
+Autentikasi nomor 8, fondasi otorisasi/CSRF nomor 9, daftar resep 10A, dan detail resep 10B selesai. Profil, pengelolaan favorit/ulasan, dan admin belum diimplementasikan; endpoint terlindungi tersebut baru berupa guarded stub dengan status `501`.

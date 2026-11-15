@@ -119,6 +119,7 @@ function mockDOM(dataset, adminLayout) {
   }
   const main = add('main', 'main');
   add('div', 'pf', main);
+  add('div', 'dr', main);
   add('div', 'ds', main);
   add('div', 'er', main, { hidden: '' });
   const loginForm = add('form', 'lf', main);
@@ -208,6 +209,55 @@ const requestFailures = [
   ['jaringan', () => { throw new Error('API unavailable'); }],
   ['HTTP error', () => response({ error: 'Layanan tidak tersedia.' }, 503)]
 ];
+
+test('detail resep gagal tidak memakai fallback demo, termasuk ID resep demo yang disembunyikan', async t => {
+  const failures = [
+    ['resep tersembunyi', () => response({ error: 'Resep tidak ditemukan.' }, 404), 'Resep tidak ditemukan'],
+    ['ID invalid', () => response({ error: 'ID tidak valid.' }, 422), 'Resep tidak ditemukan'],
+    ['server gagal', () => response({ error: 'Internal error' }, 500), 'Gagal memuat resep'],
+    ['jaringan gagal', () => { throw new Error('Offline'); }, 'Gagal memuat resep'],
+    ['JSON rusak', invalidJSON, 'Gagal memuat resep'],
+    ['recipe hilang', () => response({}), 'Gagal memuat resep'],
+    ['recipe tidak lengkap', () => response({ recipe: { title: 'Tidak lengkap' } }), 'Gagal memuat resep']
+  ];
+  for (const [name, reply, message] of failures) {
+    await t.test(name, async () => {
+      const h = harness({ page: 'detail-resep', search: '?id=1', fetch: reply });
+      await h.app.PG['detail-resep']();
+      assert.match(h.get('dr').innerHTML, new RegExp(message));
+      assert.doesNotMatch(h.get('dr').innerHTML, /Rendang Daging Sapi|Bahan-bahan|rvForm/);
+      assert.equal(h.requests.length, 1);
+      assert.match(h.requests[0].url, /recipes\.php\?id=1$/);
+      assert.deepEqual(h.local.reads, [], 'Detail tidak membaca resep/ulasan demo lokal saat API gagal');
+    });
+  }
+});
+
+test('detail resep menampilkan respons API dan rating null tidak mengambil rating demo', async () => {
+  const recipe = {
+    id: 1, title: 'Resep API <aman>', story: 'Cerita API', region: 'Daerah API',
+    cook_time_minutes: 45, difficulty: 'mudah', servings: 2, author: 'Penulis API',
+    categories: ['Kategori API'], avg_rating: null, is_favorite: true,
+    ingredients: [{ name: 'Bahan API', quantity: null, unit: null }],
+    steps: ['Langkah API'], reviews: []
+  };
+  const h = harness({ page: 'detail-resep', search: '?id=1', fetch: () => response({ recipe }) });
+  await h.app.PG['detail-resep']();
+  const html = h.get('dr').innerHTML;
+  assert.match(html, /Resep API &lt;aman&gt;/);
+  for (const text of ['Penulis API', 'Bahan API', 'Langkah API', 'Kategori API', 'Cerita API', 'Tersimpan di Favorit', 'Belum ada ulasan']) {
+    assert.ok(html.includes(text), text);
+  }
+  assert.match(html, /id="rt">★ -<\/b>/);
+  assert.doesNotMatch(html, /Rendang Daging Sapi/);
+});
+
+test('detail tanpa ID tidak menghubungi API', async () => {
+  const h = harness({ page: 'detail-resep' });
+  await h.app.PG['detail-resep']();
+  assert.match(h.get('dr').innerHTML, /Resep tidak ditemukan/);
+  assert.equal(h.requests.length, 0);
+});
 
 test('me sukses memakai identitas/peran API saja dan membersihkan fh_s tanpa menyentuh data pengguna lokal', async () => {
   const h = harness({ fetch: () => response({ user: MEMBER }) });

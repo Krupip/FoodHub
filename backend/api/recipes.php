@@ -7,7 +7,108 @@ require_once __DIR__ . '/../includes/bootstrap.php';
 requireRequestMethod('GET');
 
 if (array_key_exists('id', $_GET)) {
-    sendErrorResponse('Detail resep belum diimplementasikan.', 501);
+    $id = readQueryInt('id', 1, 4294967295);
+    if ($id === null) {
+        sendErrorResponse('Parameter id wajib diisi.', 422);
+    }
+
+    $pdo = getDatabaseConnection();
+    $stmt = $pdo->prepare(
+        'SELECT v.id, v.title, v.slug, v.region, r.story, v.image_path,
+                v.cook_time_minutes, v.difficulty, v.servings, v.is_published,
+                v.created_at, v.avg_rating, v.review_count, v.favorite_count,
+                u.name AS author
+         FROM v_recipe_cards v
+         JOIN recipes r ON r.id = v.id
+         LEFT JOIN users u ON u.id = r.created_by
+         WHERE v.id = ? AND v.is_published = 1'
+    );
+    $stmt->execute([$id]);
+    $row = $stmt->fetch();
+    if ($row === false) {
+        sendErrorResponse('Resep tidak ditemukan.', 404);
+    }
+
+    $stmt = $pdo->prepare(
+        'SELECT c.name FROM recipe_categories rc JOIN categories c ON c.id = rc.category_id
+         WHERE rc.recipe_id = ? ORDER BY c.name'
+    );
+    $stmt->execute([$id]);
+    $categories = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+    $stmt = $pdo->prepare(
+        'SELECT name, quantity, unit FROM recipe_ingredients
+         WHERE recipe_id = ? ORDER BY sort_order, id'
+    );
+    $stmt->execute([$id]);
+    $ingredients = array_map(static fn (array $ingredient): array => [
+        'name' => $ingredient['name'],
+        'quantity' => $ingredient['quantity'] === null ? null : (float) $ingredient['quantity'],
+        'unit' => $ingredient['unit'],
+    ], $stmt->fetchAll());
+
+    $stmt = $pdo->prepare(
+        'SELECT instruction FROM recipe_steps WHERE recipe_id = ? ORDER BY step_number'
+    );
+    $stmt->execute([$id]);
+    $steps = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+    $stmt = $pdo->prepare(
+        'SELECT u.name AS user_name, rv.rating, rv.comment, rv.created_at
+         FROM reviews rv JOIN users u ON u.id = rv.user_id
+         WHERE rv.recipe_id = ? ORDER BY rv.created_at DESC, rv.id DESC'
+    );
+    $stmt->execute([$id]);
+    $reviews = array_map(static fn (array $review): array => [
+        'user_name' => $review['user_name'],
+        'rating' => (int) $review['rating'],
+        'comment' => $review['comment'],
+        'created_at' => $review['created_at'],
+    ], $stmt->fetchAll());
+
+    $user = null;
+    // Pengunjung tanpa cookie tidak perlu membuat sesi untuk membaca resep publik.
+    if (isset($_COOKIE['foodhub_session']) || isset($_COOKIE['foodhub_remember'])) {
+        $user = getAuthenticatedUser();
+        if ($user === null) {
+            discardAnonymousSession();
+        } else {
+            publishCsrfToken();
+        }
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+    }
+
+    $isFavorite = false;
+    if ($user !== null) {
+        $stmt = $pdo->prepare('SELECT 1 FROM favorites WHERE user_id = ? AND recipe_id = ?');
+        $stmt->execute([$user['id'], $id]);
+        $isFavorite = $stmt->fetchColumn() !== false;
+    }
+
+    sendJsonResponse(['recipe' => [
+        'id' => (int) $row['id'],
+        'title' => $row['title'],
+        'slug' => $row['slug'],
+        'region' => $row['region'],
+        'story' => $row['story'],
+        'image_path' => $row['image_path'],
+        'cook_time_minutes' => (int) $row['cook_time_minutes'],
+        'difficulty' => $row['difficulty'],
+        'servings' => (int) $row['servings'],
+        'is_published' => (bool) $row['is_published'],
+        'created_at' => $row['created_at'],
+        'avg_rating' => $row['avg_rating'] === null ? null : (float) $row['avg_rating'],
+        'review_count' => (int) $row['review_count'],
+        'favorite_count' => (int) $row['favorite_count'],
+        'categories' => $categories,
+        'author' => $row['author'] ?? 'Tim FoodHub',
+        'ingredients' => $ingredients,
+        'steps' => $steps,
+        'reviews' => $reviews,
+        'is_favorite' => $isFavorite,
+    ]]);
 }
 
 const RECIPE_SORTS = [

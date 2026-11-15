@@ -925,7 +925,94 @@ PHP;
         expectError($response, 405, 'Daftar resep menolak method ' . $method . '.');
         expect(in_array('Allow: GET', $response['headers'], true), 'Daftar resep mengirim Allow: GET untuk ' . $method . '.');
     }
-    expectError(request($baseUrl, '/recipes?id=' . $recipeIds['a']), 501, 'Detail resep (10B) belum diimplementasikan dan tidak berpura-pura berhasil.');
+    // ---- 10B: detail resep publik dan status favorit berdasarkan sesi asli ----
+    $stmt = $testPdo->prepare('UPDATE recipes SET created_by = ? WHERE id = ?');
+    $stmt->execute([$memberIds[0], $recipeIds['b']]);
+    $stmt = $testPdo->prepare('SELECT name FROM users WHERE id = ?');
+    $stmt->execute([$memberIds[0]]);
+    $authorName = $stmt->fetchColumn();
+    $stmt = $testPdo->prepare('UPDATE recipe_ingredients SET quantity = NULL, unit = NULL WHERE recipe_id = ? AND sort_order = 2');
+    $stmt->execute([$recipeIds['b']]);
+    $stmt = $testPdo->prepare('INSERT INTO recipe_ingredients (recipe_id, name, quantity, unit, sort_order) VALUES (?, ?, 1.25, ?, 0)');
+    $stmt->execute([$recipeIds['b'], 'Bahan pecahan ✓', 'sdm']);
+    $stmt = $testPdo->prepare('INSERT INTO recipe_steps (recipe_id, step_number, instruction) VALUES (?, ?, ?)');
+    $stmt->execute([$recipeIds['b'], 2, 'Masak hingga matang.']);
+    $stmt->execute([$recipeIds['b'], 1, 'Siapkan bahan ✓.']);
+    $stmt = $testPdo->prepare('UPDATE reviews SET created_at = ? WHERE recipe_id = ?');
+    $stmt->execute(['2030-01-01 12:00:00', $recipeIds['b']]);
+
+    $detail = static fn (int $id, string $cookie = '', string $extraQuery = ''): array => request($baseUrl, '/recipes?id=' . $id . $extraQuery, 'GET', null, 'application/json', $cookie);
+    $response = $detail($recipeIds['b']);
+    expect($response['status'] === 200 && array_keys($response['body']) === ['recipe'], 'Detail publik memakai objek recipe tanpa wrapper data.');
+    expectNoAuthHeaders($response, 'Detail anonim tanpa cookie tidak membuat sesi atau menerbitkan CSRF.');
+    expect(in_array('Cache-Control: no-store', $response['headers'], true), 'Detail dengan status favorit tidak boleh di-cache.');
+    $recipe = $response['body']['recipe'];
+    foreach ($recipeB as $field => $value) {
+        expect($recipe[$field] === $value, 'Field detail konsisten dengan daftar: ' . $field);
+    }
+    expect($recipe['author'] === $authorName && $recipe['is_favorite'] === false, 'Penulis berasal dari database dan anonim bukan pemilik favorit.');
+    expect($recipe['ingredients'] === [
+        ['name' => 'Bahan pecahan ✓', 'quantity' => 1.25, 'unit' => 'sdm'],
+        ['name' => 'bahanrahasia' . $unique . ' satu', 'quantity' => 1, 'unit' => 'g'],
+        ['name' => 'bahanrahasia' . $unique . ' dua', 'quantity' => null, 'unit' => null],
+    ], 'Bahan diurutkan sort_order; takaran angka pecahan dan null dipertahankan untuk kalkulator porsi.');
+    expect($recipe['steps'] === ['Siapkan bahan ✓.', 'Masak hingga matang.'], 'Langkah berupa array teks sesuai step_number, bukan urutan insert.');
+    expect(count($recipe['reviews']) === 2 && array_column($recipe['reviews'], 'rating') === [4, 5] && array_column($recipe['reviews'], 'comment') === ['Enak', 'Mantap'], 'Ulasan diurutkan terbaru dengan ID sebagai tie-breaker.');
+    expect(array_keys($recipe['reviews'][0]) === ['user_name', 'rating', 'comment', 'created_at'] && $recipe['reviews'][1]['user_name'] === $authorName && $recipe['reviews'][0]['created_at'] === '2030-01-01 12:00:00', 'Ulasan hanya mengekspos nama, rating integer, komentar, dan waktu; tanpa email/hash.');
+    expect(array_keys($recipe) === array_merge(array_keys($recipeB), ['author', 'ingredients', 'steps', 'reviews', 'is_favorite']), 'Detail tidak membocorkan kolom akun atau token autentikasi.');
+    $empty = $detail($recipeIds['d'])['body']['recipe'];
+    expect($empty['categories'] === [] && $empty['ingredients'] === [] && $empty['steps'] === [] && $empty['reviews'] === [], 'Relasi kosong tetap dikirim sebagai array kosong.');
+    expect($empty['author'] === 'Tim FoodHub' && $empty['avg_rating'] === null && $empty['is_favorite'] === false, 'Penulis kosong memakai Tim FoodHub dan resep tanpa ulasan memiliki rating null.');
+    $forged = $detail($recipeIds['b'], '', '&user_id=' . $memberIds[0] . '&role=admin');
+    expect($forged['body']['recipe']['is_favorite'] === false, 'ID pengguna/role di query tidak dapat memalsukan status favorit.');
+    foreach (['foodhub_session=tidakvalid', 'foodhub_remember=rusak', $deletedSessionCookie] as $invalidCookie) {
+        $response = $detail($recipeIds['b'], $invalidCookie);
+        expect($response['status'] === 200 && $response['body']['recipe']['is_favorite'] === false, 'Cookie invalid atau akun terhapus tetap dapat membaca detail sebagai tamu.');
+        expectNoAuthHeaders($response, 'Detail tamu dengan cookie invalid tidak menimpa cookie tab lain.');
+    }
+
+    $response = request($baseUrl, '/auth?action=login', 'POST', json_encode($login, JSON_THROW_ON_ERROR));
+    $detailCookie = sessionCookie($response);
+    $detailCsrf = responseCsrfToken($response);
+    $response = $detail($recipeIds['b'], $detailCookie);
+    expect($response['status'] === 200 && $response['body']['recipe']['is_favorite'] === true && responseCsrfToken($response) === $detailCsrf, 'Sesi member membaca favoritnya dan mempertahankan CSRF.');
+    expect($detail($recipeIds['d'], $detailCookie)['body']['recipe']['is_favorite'] === false, 'Login tidak membuat semua resep otomatis menjadi favorit.');
+    expect($detail($recipeIds['b'], $newAccountCookie)['body']['recipe']['is_favorite'] === false, 'Favorit pengguna lain tidak bocor ke pengguna yang sedang login.');
+    expect($detail($recipeIds['a'], $newAccountCookie)['body']['recipe']['is_favorite'] === true, 'Pengguna kedua mendapat status favorit miliknya sendiri.');
+
+    foreach (['', '%20', '0', '-1', '1.5', '1e2', 'abc', '4294967296', '99999999999', '%00', '%B1', '1%20OR%201=1'] as $invalidId) {
+        $response = request($baseUrl, '/recipes?id=' . $invalidId);
+        expectError($response, 422, 'ID detail tidak valid ditolak: ' . $invalidId);
+        expectNoAuthHeaders($response, 'ID tidak valid tidak membuat sesi.');
+    }
+    expectError(request($baseUrl, '/recipes?id[]=1'), 422, 'ID detail berbentuk array ditolak.');
+    expect($detail($recipeIds['b'], '', '&q=tidakcocok&sort=invalid')['body']['recipe']['id'] === $recipeIds['b'], 'Parameter daftar tidak mengubah lookup detail berdasarkan ID.');
+    expectError($detail($recipeIds['c']), 404, 'Resep disembunyikan tidak tersedia lewat URL detail langsung.');
+    $stmt = $testPdo->prepare('UPDATE users SET role = ? WHERE id = ?');
+    $stmt->execute(['admin', $memberIds[0]]);
+    expectError($detail($recipeIds['c'], $detailCookie), 404, 'Endpoint publik tidak mengekspos resep tersembunyi meskipun pembaca admin.');
+    $stmt->execute(['member', $memberIds[0]]);
+    $stmt = $testPdo->prepare('DELETE FROM recipes WHERE id = ?');
+    $stmt->execute([$recipeIds['d']]);
+    expectError($detail($recipeIds['d']), 404, 'Resep yang sudah dihapus menghasilkan 404.');
+    foreach (['POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'] as $method) {
+        $response = request($baseUrl, '/recipes?id=' . $recipeIds['b'], $method, '{}');
+        expect($response['status'] === 405 && ($method === 'HEAD' || isset($response['body']['error'])), 'Detail menolak method ' . $method . '.');
+        expect(in_array('Allow: GET', $response['headers'], true), 'Detail mengirim Allow: GET.');
+    }
+
+    $response = request($baseUrl, '/auth?action=login', 'POST', json_encode($rememberLogin, JSON_THROW_ON_ERROR));
+    $detailRememberCookie = responseCookie($response, 'foodhub_remember');
+    $response = $detail($recipeIds['b'], $detailRememberCookie);
+    expect($response['status'] === 200 && $response['body']['recipe']['is_favorite'] === true, 'Detail memulihkan remember valid tanpa wajib mengunjungi me lebih dahulu.');
+    $restoredDetailCookie = sessionCookie($response);
+    $restoredDetailCsrf = responseCsrfToken($response);
+    expect(responseCookie($response, 'foodhub_remember') !== $detailRememberCookie, 'Pemulihan remember lewat detail merotasi verifier.');
+    $replay = $detail($recipeIds['b'], $detailRememberCookie);
+    expect($replay['status'] === 200 && $replay['body']['recipe']['is_favorite'] === false, 'Replay remember lama hanya mendapat detail anonim.');
+    expectNoAuthHeaders($replay, 'Replay di detail tidak menimpa cookie pemulihan yang sah.');
+    $response = request($baseUrl, '/auth?action=logout', 'POST', '{}', 'application/json', $restoredDetailCookie, ['X-CSRF-Token' => $restoredDetailCsrf]);
+    expect($response['status'] === 200 && $detail($recipeIds['b'], $restoredDetailCookie)['body']['recipe']['is_favorite'] === false, 'Setelah logout detail kembali memakai status favorit anonim.');
 
     echo 'Semua pengujian lulus; akun dan sesi khusus pengujian dibersihkan setelah selesai.', PHP_EOL;
 } catch (Throwable $exception) {
