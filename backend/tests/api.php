@@ -890,7 +890,57 @@ PHP;
             }
         }
     }
-    $me = request($baseUrl, '/auth?action=me', 'GET', null, 'application/json', 'foodhub_session=' . bin2hex(random_bytes(16)));
+    $me = request($baseUrl, '/auth?action=me', 'GET', null, 'application/json', 'foodhub_session=' . binhex(random_bytes(16)));
+
+/* -------------------------------------------------
+   TEST ADMIN USERS & STATS ENDPOINTS
+   ------------------------------------------------- */
+// GET /api/admin/users.php
+$response = request($baseUrl, '/api/admin/users.php', 'GET', null, 'application/json', $adminCookie);
+expect($response['status'] === 200, 'GET admin users harus 200');
+expect(is_array($response['body']['users']), 'GET admin users mengembalikan array users');
+expect(isset($response['body']['users'][0]['email']), 'Setiap user memiliki email');
+
+// POST /api/admin/users.php
+$newUserPayload = [
+    'name' => 'Pengguna Baru',
+    'email' => $testPrefix . '-new@example.test',
+    'password' => 'password123',
+];
+$postRes = request(
+    $baseUrl,
+    '/api/admin/users.php',
+    'POST',
+    json_encode($newUserPayload, JSON_THROW_ON_ERROR),
+    'application/json',
+    $adminCookie,
+    ['X-CSRF-Token' => $adminCsrf]
+);
+expect($postRes['status'] === 201, 'POST admin users harus 201');
+expect(isset($postRes['body']['user']['id']), 'POST mengembalikan id user baru');
+$newUserId = (int)$postRes['body']['user']['id'];
+
+// DELETE /api/admin/users.php
+$deleteRes = request(
+    $baseUrl,
+    '/api/admin/users.php?id=' . $newUserId,
+    'DELETE',
+    null,
+    'application/json',
+    $adminCookie,
+    ['X-CSRF-Token' => $adminCsrf]
+);
+expect($deleteRes['status'] === 200, 'DELETE admin user harus 200');
+expect($deleteRes['body']['message'] === 'Pengguna berhasil dihapus.', 'Response DELETE berisi pesan sukses');
+
+// GET /api/admin/stats.php
+$statsRes = request($baseUrl, '/api/admin/stats.php', 'GET', null, 'application/json', $adminCookie);
+expect($statsRes['status'] === 200, 'GET admin stats harus 200');
+$stats = $statsRes['body']['stats'];
+expect(is_int($stats['total_recipes']), 'stats.total_recipes integer');
+expect(is_int($stats['published_recipes']), 'stats.published_recipes integer');
+expect(is_int($stats['hidden_recipes']), 'stats.hidden_recipes integer');
+expect(is_int($stats['total_users']), 'stats.total_users integer');
     expect($me['body'] === ['user' => null], 'ID sesi palsu tidak menjadi identitas pengguna.');
 
     foreach ([[], ['X-CSRF-Token' => 'false'], ['X-CSRF-Token' => str_repeat('0', 64)], ['X-CSRF-Token' => $registrationCsrf], ['X-CSRF-Token' => $adminCsrf]] as $csrfHeaders) {
