@@ -937,6 +937,138 @@ Menghapus ulasan yang ditulis pengguna yang sedang login untuk resep yang bersan
 | `422` | `recipe_id` tidak valid, `rating` di luar 1–5, atau `comment` > 1000 karakter |
 | `500` | Kesalahan internal server / basis data |
 
+## API kelola dan moderasi resep admin (14)
+
+### 1. Membaca daftar semua resep
+```http
+GET /FoodHub/backend/api/admin/recipes.php
+```
+Mengembalikan seluruh daftar resep (tayang dan tersembunyi) beserta statistik total, bahan, langkah, dan kategori. Wajib login sebagai admin (`requireAdmin()`).
+
+Parameter opsional:
+- `id`: Membaca detail lengkap satu resep berdasarkan ID.
+- `search`: Pencarian resep berdasarkan judul.
+- `status`: Filter status publikasi (`published` atau `hidden`).
+
+### 2. Menambah resep baru
+```http
+POST /FoodHub/backend/api/admin/recipes.php
+Content-Type: application/json
+X-CSRF-Token: <token_csrf_sesi>
+```
+Body JSON:
+```json
+{
+  "title": "Ayam Taliwang Lombok",
+  "region": "Nusa Tenggara Barat",
+  "story": "Ayam bakar bumbu pedas aromatik khas Lombok.",
+  "cook_time_minutes": 45,
+  "difficulty": "sedang",
+  "servings": 4,
+  "image_path": "img/ayam-betutu.jpg",
+  "is_published": true,
+  "categories": ["Makanan Berat"],
+  "ingredients": [
+    {"name": "Ayam kampung", "quantity": 1, "unit": "ekor"}
+  ],
+  "steps": [
+    "Belah ayam membujur lalu lumuri bumbu halus.",
+    "Bakar ayam hingga matang dan harum."
+  ]
+}
+```
+Respons berhasil: `201 Created` dengan objek `recipe`.
+
+### 3. Memperbarui resep
+```http
+PUT /FoodHub/backend/api/admin/recipes.php?id=1
+Content-Type: application/json
+X-CSRF-Token: <token_csrf_sesi>
+```
+Memperbarui seluruh data resep, bahan, langkah, dan kategorinya. Respons berhasil: `200 OK`.
+
+### 4. Moderasi status resep (Tayangkan / Sembunyikan)
+```http
+PATCH /FoodHub/backend/api/admin/recipes.php?id=1
+Content-Type: application/json
+X-CSRF-Token: <token_csrf_sesi>
+```
+Body JSON:
+```json
+{
+  "is_published": false
+}
+```
+Respons berhasil: `200 OK` dengan status `is_published` terbaru.
+
+### 5. Menghapus resep
+```http
+DELETE /FoodHub/backend/api/admin/recipes.php?id=1
+X-CSRF-Token: <token_csrf_sesi>
+```
+Menghapus resep dari basis data. Relasi bahan, langkah, kategori, favorit, dan ulasan terhapus otomatis melalui `ON DELETE CASCADE`. Respons berhasil: `200 OK`.
+
+---
+
+## API kelola pengguna admin (15)
+
+### 1. Membaca daftar pengguna
+```http
+GET /FoodHub/backend/api/admin/users.php
+```
+Mengembalikan daftar seluruh pengguna terdaftar (`id`, `name`, `email`, `role`, `created_at`). Wajib login sebagai admin (`requireAdmin()`).
+
+### 2. Menambah pengguna baru
+```http
+POST /FoodHub/backend/api/admin/users.php
+Content-Type: application/json
+X-CSRF-Token: <token_csrf_sesi>
+```
+Body JSON:
+```json
+{
+  "name": "Budi Santoso",
+  "email": "budi@contoh.id",
+  "password": "password123"
+}
+```
+Aturan validasi:
+- `name`: Wajib, 3–100 karakter.
+- `email`: Format email valid, maksimal 254 karakter, belum terdaftar sebelumnya (`409 Conflict` jika duplikat).
+- `password`: Minimal 8 karakter, maksimal 72 karakter. Peran pengguna baru selalu `member`.
+Respons berhasil: `201 Created` dengan objek `user` tanpa hash/password.
+
+### 3. Menghapus pengguna
+```http
+DELETE /FoodHub/backend/api/admin/users.php?id=2
+X-CSRF-Token: <token_csrf_sesi>
+```
+Menghapus akun pengguna selain akun admin sendiri (`403` jika mencoba menghapus akun admin sendiri atau akun admin lain). Respons berhasil: `200 OK`.
+
+---
+
+## API statistik dasbor admin (16)
+
+```http
+GET /FoodHub/backend/api/admin/stats.php
+```
+Mengembalikan ringkasan statistik sistem untuk dasbor admin. Wajib login sebagai admin (`requireAdmin()`).
+
+Respons berhasil — 200:
+```json
+{
+  "stats": {
+    "total_recipes": 15,
+    "published_recipes": 14,
+    "hidden_recipes": 1,
+    "total_users": 5
+  }
+}
+```
+Method selain GET (mis. POST) ditolak dengan status `405 Method Not Allowed` dan header `Allow: GET`.
+
+---
+
 ## Pengujian otomatis
 
 Dari direktori utama proyek, jalankan:
@@ -993,5 +1125,8 @@ Tes Node memakai VM/mock DOM/fetch untuk memeriksa kontrak autentikasi, fail-clo
 - Profil pengguna (11): membaca profil akun lengkap dari database, validasi nama 3–100 karakter dan bio opsional, penolakan manipulasi role/id/email, proteksi CSRF pada POST/PUT/PATCH, method DELETE ditolak 405.
 - Resep favorit (12): membaca daftar resep favorit terurut terbaru, menambah favorit dengan validasi status publikasi resep, menghapus favorit, proteksi CSRF pada POST/DELETE, method selain GET/POST/DELETE ditolak 405.
 - Rating & ulasan (13): menulis dan memperbarui ulasan (1 per member per resep), rating 1–5, validasi panjang komentar, membaca ulasan per resep/pengguna, menghapus ulasan, proteksi CSRF pada POST/DELETE.
+- Kelola resep admin (14): membaca semua resep (termasuk hidden), menambah resep baru lengkap (201), edit resep (PUT), moderasi status publikasi (PATCH), hapus resep (DELETE), validasi input dan proteksi CSRF.
+- Kelola pengguna admin (15): membaca daftar pengguna, menambah pengguna baru dengan validasi dan pencegahan email duplikat (409), menghapus akun member (DELETE) dengan proteksi anti-hapus admin sendiri.
+- Statistik dasbor admin (16): membaca total resep, resep tayang, resep disembunyikan, dan total pengguna terdaftar via GET. Method selain GET ditolak 405.
 
-Autentikasi nomor 8, fondasi otorisasi/CSRF nomor 9, daftar resep 10A, detail resep 10B, API profil pengguna (11), API favorit resep (12), dan API rating & ulasan (13) selesai. Pengelolaan admin belum diimplementasikan; endpoint terlindungi tersebut baru berupa guarded stub dengan status `501`.
+Autentikasi nomor 8, fondasi otorisasi/CSRF nomor 9, daftar resep 10A, detail resep 10B, API profil pengguna (11), API favorit resep (12), API rating & ulasan (13), serta pengelolaan admin (14, 15, 16) selesai dan lulus seluruh pengujian otomatis.
