@@ -498,7 +498,7 @@ PHP;
         ['/protected/member', $adminCookie, $adminCsrf, $adminUser, 200],
         ['/protected/admin', $adminCookie, $adminCsrf, $adminUser, 200],
     ];
-    $stubPaths = array_diff(array_keys($guardedPaths), ['/api/profile.php', '/api/favorites.php', '/api/reviews.php']);
+    $stubPaths = array_diff(array_keys($guardedPaths), ['/api/profile.php', '/api/favorites.php', '/api/reviews.php', '/api/admin/recipes.php']);
     foreach ($stubPaths as $path) {
         if (str_starts_with($path, '/api/admin/')) {
             $allowedCases[] = [$path, $adminCookie, $adminCsrf, $adminUser, 501];
@@ -742,6 +742,99 @@ PHP;
     expect((int) $stmt->fetchColumn() === 0, 'Ulasan di database terhapus.');
     echo '[OK] Endpoint /api/reviews.php (GET, POST, DELETE) berhasil diuji secara komprehensif.', PHP_EOL;
 
+    // ---- Pengujian API Kelola Resep Admin (/api/admin/recipes.php) ----
+    // 1. GET daftar semua resep untuk admin
+    $adminListRes = request($baseUrl, '/api/admin/recipes.php', 'GET', null, 'application/json', $adminCookie);
+    expect($adminListRes['status'] === 200, 'GET /api/admin/recipes.php mengembalikan status 200.');
+    expect(isset($adminListRes['body']['recipes']) && is_array($adminListRes['body']['recipes']), 'GET admin/recipes mengembalikan array recipes.');
+    expect($adminListRes['body']['total'] >= 14, 'Daftar resep admin memuat seluruh resep.');
+    expect(responseCsrfToken($adminListRes) === $adminCsrf, 'GET admin/recipes menerbitkan token CSRF yang stabil.');
+
+    // 2. Akses ditolak untuk member biasa
+    $memberDenied = request($baseUrl, '/api/admin/recipes.php', 'GET', null, 'application/json', $loginCookie);
+    expectError($memberDenied, 403, 'Member biasa ditolak 403 saat mengakses /api/admin/recipes.php.');
+
+    // 3. Validasi POST tambah resep
+    expectError(request($baseUrl, '/api/admin/recipes.php', 'POST', '{}', 'application/json', $adminCookie), 403, 'POST admin tanpa CSRF ditolak.');
+    expectError(request($baseUrl, '/api/admin/recipes.php', 'POST', '{}', 'application/json', $adminCookie, ['X-CSRF-Token' => $adminCsrf]), 422, 'POST tanpa title ditolak.');
+    expectError(request($baseUrl, '/api/admin/recipes.php', 'POST', json_encode(['title' => 'ab', 'story' => 'cerita']), 'application/json', $adminCookie, ['X-CSRF-Token' => $adminCsrf]), 422, 'POST title < 3 karakter ditolak.');
+    expectError(request($baseUrl, '/api/admin/recipes.php', 'POST', json_encode(['title' => 'Resep Baru', 'story' => '']), 'application/json', $adminCookie, ['X-CSRF-Token' => $adminCsrf]), 422, 'POST story kosong ditolak.');
+    expectError(request($baseUrl, '/api/admin/recipes.php', 'POST', json_encode(['title' => 'Resep Baru', 'story' => 'cerita', 'cook_time_minutes' => 0]), 'application/json', $adminCookie, ['X-CSRF-Token' => $adminCsrf]), 422, 'POST waktu 0 menit ditolak.');
+    expectError(request($baseUrl, '/api/admin/recipes.php', 'POST', json_encode(['title' => 'Resep Baru', 'story' => 'cerita', 'difficulty' => 'salah']), 'application/json', $adminCookie, ['X-CSRF-Token' => $adminCsrf]), 422, 'POST difficulty tidak valid ditolak.');
+
+    // 4. POST tambah resep berhasil (lengkap dengan kategori, bahan, dan langkah)
+    $newRecipePayload = [
+        'title' => 'Ayam Taliwang Lombok Uji',
+        'region' => 'Nusa Tenggara Barat',
+        'story' => 'Ayam bakar dengan bumbu cabai dan terasi aromatik khas Lombok.',
+        'categories' => ['Makanan Berat'],
+        'cook_time_minutes' => 45,
+        'difficulty' => 'sedang',
+        'servings' => 4,
+        'image_path' => 'img/ayam-betutu.jpg',
+        'is_published' => true,
+        'ingredients' => [
+            ['name' => 'Ayam kampung', 'quantity' => 1, 'unit' => 'ekor'],
+            ['name' => 'Cabai rawit', 'quantity' => 10, 'unit' => 'buah'],
+        ],
+        'steps' => [
+            'Belah ayam kampung membujur lalu pipihkan.',
+            'Bakar ayam hingga harum lalu lumuri dengan bumbu halus.',
+        ],
+    ];
+    $createRecipeRes = request($baseUrl, '/api/admin/recipes.php', 'POST', json_encode($newRecipePayload), 'application/json', $adminCookie, ['X-CSRF-Token' => $adminCsrf]);
+    expect($createRecipeRes['status'] === 201, 'POST /api/admin/recipes.php mengembalikan status 201.');
+    $createdRecipeId = (int) $createRecipeRes['body']['recipe']['id'];
+    expect($createdRecipeId > 0, 'Resep baru memperoleh ID valid.');
+
+    // 5. GET detail resep oleh admin
+    $adminDetailRes = request($baseUrl, '/api/admin/recipes.php?id=' . $createdRecipeId, 'GET', null, 'application/json', $adminCookie);
+    expect($adminDetailRes['status'] === 200, 'GET detail resep admin berhasil 200.');
+    $detailData = $adminDetailRes['body']['recipe'];
+    expect($detailData['title'] === 'Ayam Taliwang Lombok Uji', 'Judul resep detail sesuai input.');
+    expect($detailData['categories'] === ['Makanan Berat'], 'Kategori resep tersimpan.');
+    expect(count($detailData['ingredients']) === 2 && $detailData['ingredients'][0]['name'] === 'Ayam kampung', 'Bahan resep tersimpan.');
+    expect(count($detailData['steps']) === 2 && $detailData['steps'][0] === 'Belah ayam kampung membujur lalu pipihkan.', 'Langkah resep tersimpan.');
+
+    // 6. PUT pembaruan resep
+    $updatedPayload = array_merge($newRecipePayload, [
+        'title' => 'Ayam Taliwang Lombok Super Pedas',
+        'story' => 'Versi super pedas dengan tambahan cabai rawit merah.',
+        'cook_time_minutes' => 50,
+    ]);
+    $putRecipeRes = request($baseUrl, '/api/admin/recipes.php?id=' . $createdRecipeId, 'PUT', json_encode($updatedPayload), 'application/json', $adminCookie, ['X-CSRF-Token' => $adminCsrf]);
+    expect($putRecipeRes['status'] === 200, 'PUT /api/admin/recipes.php berhasil 200.');
+    $stmt = $testPdo->prepare('SELECT title, cook_time_minutes FROM recipes WHERE id = ?');
+    $stmt->execute([$createdRecipeId]);
+    $updatedRow = $stmt->fetch();
+    expect($updatedRow['title'] === 'Ayam Taliwang Lombok Super Pedas' && (int) $updatedRow['cook_time_minutes'] === 50, 'Data resep di MySQL terupdate.');
+
+    // 7. PATCH moderasi resep (Sembunyikan dan Tayangkan)
+    $patchHideRes = request($baseUrl, '/api/admin/recipes.php?id=' . $createdRecipeId, 'PATCH', '{"is_published":false}', 'application/json', $adminCookie, ['X-CSRF-Token' => $adminCsrf]);
+    expect($patchHideRes['status'] === 200 && $patchHideRes['body']['is_published'] === false, 'PATCH sembunyikan resep berhasil.');
+    $stmt = $testPdo->prepare('SELECT is_published FROM recipes WHERE id = ?');
+    $stmt->execute([$createdRecipeId]);
+    expect((int) $stmt->fetchColumn() === 0, 'Status is_published menjadi 0 di database.');
+
+    // Resep disembunyikan tidak muncul di endpoint publik
+    $pubCheck = request($baseUrl, '/recipes?id=' . $createdRecipeId);
+    expectError($pubCheck, 404, 'Resep disembunyikan admin tidak dapat diakses lewat endpoint publik.');
+
+    // Tayangkan kembali
+    $patchPubRes = request($baseUrl, '/api/admin/recipes.php?id=' . $createdRecipeId, 'PATCH', '{"is_published":true}', 'application/json', $adminCookie, ['X-CSRF-Token' => $adminCsrf]);
+    expect($patchPubRes['status'] === 200 && $patchPubRes['body']['is_published'] === true, 'PATCH tayangkan resep berhasil.');
+
+    // 8. DELETE hapus resep oleh admin
+    $deleteRecipeRes = request($baseUrl, '/api/admin/recipes.php?id=' . $createdRecipeId, 'DELETE', null, 'application/json', $adminCookie, ['X-CSRF-Token' => $adminCsrf]);
+    expect($deleteRecipeRes['status'] === 200, 'DELETE /api/admin/recipes.php berhasil 200.');
+    $stmt = $testPdo->prepare('SELECT id FROM recipes WHERE id = ?');
+    $stmt->execute([$createdRecipeId]);
+    expect($stmt->fetch() === false, 'Resep terhapus dari tabel recipes.');
+    $stmt = $testPdo->prepare('SELECT id FROM recipe_ingredients WHERE recipe_id = ?');
+    $stmt->execute([$createdRecipeId]);
+    expect($stmt->fetch() === false, 'Bahan resep ikut terhapus otomatis melalui ON DELETE CASCADE.');
+    echo '[OK] Endpoint /api/admin/recipes.php (CRUD & Moderasi) berhasil diuji secara komprehensif.', PHP_EOL;
+
     $switchLogin = request($baseUrl, '/auth?action=login', 'POST', json_encode($login, JSON_THROW_ON_ERROR));
     expect($switchLogin['status'] === 200 && $switchLogin['body'] === ['user' => $user], 'Login publik untuk uji pergantian akun tidak membutuhkan CSRF.');
     $switchOldCookie = sessionCookie($switchLogin);
@@ -777,11 +870,18 @@ PHP;
             expect($memberAccess['status'] === 200 && $memberAccess['body'] === ['user' => $currentAdminUser], 'Guard member mengembalikan role terbaru ' . $role . '.');
             foreach ($adminPaths as $path) {
                 foreach (['GET', 'POST'] as $method) {
-                    $roleAccess = request($baseUrl, $path . '?role=admin&id=' . $adminId, $method, $method === 'POST' ? '{"role":"admin"}' : null, 'application/json', $roleCookie, $method === 'POST' ? ['X-CSRF-Token' => $roleCsrf] : []);
+                    $targetUrl = $path . '?role=admin' . ($path === '/api/admin/recipes.php' ? '' : '&id=' . $adminId);
+                    $roleAccess = request($baseUrl, $targetUrl, $method, $method === 'POST' ? '{"role":"admin"}' : null, 'application/json', $roleCookie, $method === 'POST' ? ['X-CSRF-Token' => $roleCsrf] : []);
                     if ($role === 'member') {
                         expectError($roleAccess, 403, 'Demosi langsung mencabut izin admin meski query/body mengaku admin: ' . $method . ' ' . $path);
                     } elseif ($path === '/protected/admin') {
                         expect($roleAccess['status'] === 200 && $roleAccess['body'] === ['user' => $adminUser], 'Promosi langsung mengizinkan admin dengan cookie lama: ' . $method);
+                    } elseif ($path === '/api/admin/recipes.php') {
+                        if ($method === 'GET') {
+                            expect($roleAccess['status'] === 200 && isset($roleAccess['body']['recipes']), 'Promosi langsung mengizinkan admin melihat resep: ' . $method);
+                        } else {
+                            expectError($roleAccess, 422, 'POST tanpa field resep ditolak 422 untuk admin sah: ' . $method);
+                        }
                     } else {
                         expectError($roleAccess, 501, 'Promosi langsung mencapai stub admin asli: ' . $method . ' ' . $path);
                     }
