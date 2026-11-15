@@ -16,10 +16,10 @@ frontend/
 ├── daftar.html              # Form registrasi akun member baru
 ├── profil.html              # Profil akun: info pengguna & koleksi Resep Favorit tersimpan
 ├── admin/                   # Modul Panel Pengelola (Admin)
-│   ├── dasbor.html          # Ringkasan statistik sistem (resep tayang, sembunyi, pengguna)
-│   ├── kelola-resep.html    # UI tambah/edit/hapus resep; backend masih guarded stub 501
+│   ├── dasbor.html          # Ringkasan statistik sistem dari API database
+│   ├── kelola-resep.html    # UI tambah/edit/hapus resep terhubung ke API admin
 │   ├── moderasi-resep.html  # UI moderasi status publikasi resep (Tayang / Sembunyi)
-│   └── kelola-pengguna.html # Daftar & hapus pengguna demo lokal, bukan akun database
+│   └── kelola-pengguna.html # Daftar, tambah, & hapus pengguna terhubung ke API admin
 ├── css/
 │   └── style.css            # Seluruh aturan gaya, palet warna, layout grid & responsif
 ├── js/
@@ -60,12 +60,12 @@ Bagian ini menjelaskan antarmuka yang tersedia, **bukan klaim bahwa CRUD backend
 
 ### 5. Panel Pengelola Admin (`admin/`)
 - **Kelola Resep**:
-  - **Tambah Resep Baru**: Dialog formulir modal lengkap (nama resep, asal daerah, kategori, waktu, kesulitan, porsi, gambar, cerita, daftar bahan, dan langkah memasak).
-  - **Edit Resep**: Membuka data resep yang ada ke formulir untuk diperbarui.
-  - **Hapus Resep**: Tombol dan konfirmasi hapus tersedia, tetapi belum menghapus resep database.
-  - Endpoint administrasi resep masih guarded stub `501`; tambah/edit/hapus belum merupakan CRUD backend yang berfungsi.
-- **Moderasi Resep**: UI status tayang/sembunyi tersedia (`is_published = 1` vs `0`); mutasi backend belum diimplementasikan.
-- **Kelola Pengguna**: Tabel dan aksi hapus masih memakai pengguna demo lokal, bukan daftar/penghapusan akun database.
+  - **Tambah Resep Baru**: Dialog formulir modal lengkap terhubung ke `POST /api/admin/recipes.php`.
+  - **Edit Resep**: Membuka data resep ke formulir modal dan menyimpan pembaruan ke `PUT /api/admin/recipes.php`.
+  - **Hapus Resep**: Tombol dan konfirmasi hapus terhubung ke `DELETE /api/admin/recipes.php`.
+- **Moderasi Resep**: Mengubah status tayang/sembunyi via `PATCH /api/admin/recipes.php`.
+- **Kelola Pengguna**: Menampilkan akun pengguna database (`GET /api/admin/users.php`), menambah akun member baru (`POST /api/admin/users.php`), dan menghapus akun member (`DELETE /api/admin/users.php`).
+- **Dasbor**: Menampilkan ringkasan statistik real-time dari database (`GET /api/admin/stats.php`).
 
 ---
 

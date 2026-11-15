@@ -1573,23 +1573,26 @@
        Halaman Admin (Terhubung ke api/admin/recipes.php)
        ========================================================================== */
     async dasbor() {
-      let list = [];
+      let stats = { total_recipes: 0, published_recipes: 0, hidden_recipes: 0, total_users: 0 };
       try {
-        const res = await api('admin/recipes.php');
-        list = res.recipes || [];
+        const res = await api('admin/stats.php');
+        if (res && res.stats) {
+          stats = res.stats;
+        }
       } catch (e) {
-        list = recipesList();
+        const list = recipesList();
+        stats.total_recipes = list.length;
+        stats.published_recipes = list.filter(r => r.is_published !== false && !hid().includes(r.id)).length;
+        stats.hidden_recipes = stats.total_recipes - stats.published_recipes;
+        stats.total_users = users().length;
       }
-      const total = list.length;
-      const tayang = list.filter(r => r.is_published !== false && !hid().includes(r.id)).length;
-      const hidden = total - tayang;
 
       $('#ds').innerHTML = `
         <div class="stat">
-          <div class="panel"><b>${total}</b>Total resep</div>
-          <div class="panel"><b>${tayang}</b>Resep tayang</div>
-          <div class="panel"><b>${hidden}</b>Resep disembunyikan</div>
-          <div class="panel"><b>${users().length}</b>Pengguna</div>
+          <div class="panel"><b>${stats.total_recipes}</b>Total resep</div>
+          <div class="panel"><b>${stats.published_recipes}</b>Resep tayang</div>
+          <div class="panel"><b>${stats.hidden_recipes}</b>Resep disembunyikan</div>
+          <div class="panel"><b>${stats.total_users}</b>Pengguna</div>
         </div>
         <div class="row">
           <div class="grow">
@@ -1601,7 +1604,7 @@
         <div class="row">
           <div class="grow">
             <b>Kelola pengguna</b><br>
-            <span class="muted sm">Lihat dan hapus akun member.</span>
+            <span class="muted sm">Lihat, tambah, dan hapus akun member.</span>
           </div>
           <a class="btn sm" href="kelola-pengguna.html">Buka</a>
         </div>
@@ -1979,50 +1982,184 @@
       this['kelola-resep']();
     },
 
-    'kelola-pengguna'() {
+    async 'kelola-pengguna'() {
+      const rootEl = $('#us');
+      if (!rootEl) return;
+
+      let userList = [];
+      const fetchUsers = async () => {
+        try {
+          const res = await api('admin/users.php');
+          userList = (res && res.users) ? res.users : [];
+        } catch (err) {
+          userList = users();
+        }
+        draw();
+      };
+
       const draw = () => {
-        $('#us').innerHTML = `
+        rootEl.innerHTML = `
+          <div class="sec-h" style="margin-bottom:1.2rem">
+            <div>
+              <h1 style="margin:0">Kelola Pengguna</h1>
+              <p class="muted sm" style="margin:.3rem 0 0">Lihat, tambah, dan hapus akun pengguna di FoodHub.</p>
+            </div>
+            <button class="btn sm" id="btnTambahPengguna" type="button">
+              ${ic('plus')} Tambah Pengguna
+            </button>
+          </div>
+
           <div class="tw">
             <table>
               <thead>
                 <tr>
+                  <th style="width:50px">ID</th>
                   <th>Nama</th>
                   <th>Email</th>
                   <th>Peran</th>
                   <th>Bergabung</th>
-                  <th>Aksi</th>
+                  <th style="width:120px">Aksi</th>
                 </tr>
               </thead>
               <tbody>
-                ${users().map(u => `
+                ${userList.length ? userList.map(u => `
                   <tr>
+                    <td><b>#${esc(u.id || '-')}</b></td>
                     <td>${esc(u.name)}</td>
                     <td>${esc(u.email)}</td>
                     <td><span class="sts ${u.role === 'admin' ? 'admin' : 'selesai'}">${esc(u.role)}</span></td>
-                    <td>${esc(u.at || '-')}</td>
+                    <td>${esc(u.created_at || u.at || '-')}</td>
                     <td>
-                      ${u.role === 'admin'
+                      ${u.role === 'admin' || (U && u.id && u.id === U.id)
                         ? '<span class="muted sm">Tidak dapat dihapus</span>'
-                        : `<button class="btn danger sm" type="button" data-e="${esc(u.email)}">${ic('trash')} Hapus</button>`
+                        : `<button class="btn danger sm" type="button" data-id="${esc(u.id || '')}" data-e="${esc(u.email)}" data-n="${esc(u.name)}">${ic('trash')} Hapus</button>`
                       }
                     </td>
                   </tr>
-                `).join('')}
+                `).join('') : `
+                  <tr><td colspan="6" class="muted" style="text-align:center;padding:24px;">Tidak ada pengguna terdaftar.</td></tr>
+                `}
               </tbody>
             </table>
+          </div>
+
+          <div class="modal-backdrop" id="userModal" hidden>
+            <div class="modal-box" style="max-width:480px">
+              <div class="modal-h">
+                <h2>Tambah Pengguna Baru</h2>
+                <button class="modal-close" id="userModalClose" type="button">&times;</button>
+              </div>
+              <form id="userForm" novalidate>
+                <div class="fld">
+                  <label for="uf_name">Nama Lengkap *</label>
+                  <input type="text" id="uf_name" required placeholder="Contoh: Budi Santoso" minlength="3" maxlength="100">
+                </div>
+                <div class="fld">
+                  <label for="uf_email">Alamat Email *</label>
+                  <input type="email" id="uf_email" required placeholder="budi@contoh.id" maxlength="254">
+                </div>
+                <div class="fld">
+                  <label for="uf_password">Kata Sandi *</label>
+                  <input type="password" id="uf_password" required placeholder="Minimal 8 karakter" minlength="8" maxlength="72">
+                  <span class="muted sm">Pengguna baru otomatis berstatus Member.</span>
+                </div>
+                <div class="bar err" id="userFormErr" hidden></div>
+                <div style="display:flex;justify-content:flex-end;gap:.6rem;margin-top:1.5rem">
+                  <button class="btn ghost" type="button" id="userModalCancel">Batal</button>
+                  <button class="btn" type="submit" id="userModalSubmit">Simpan Pengguna</button>
+                </div>
+              </form>
+            </div>
           </div>
         `;
       };
 
-      $('#us').addEventListener('click', e => {
-        const b = e.target.closest('[data-e]');
-        if (!b || !confirm(`Hapus pengguna ${b.dataset.e}?`)) return;
-        sv('fh_users', users().filter(u => u.email !== b.dataset.e));
-        draw();
-        toast('Pengguna dihapus.');
+      const openModal = () => {
+        const modal = $('#userModal');
+        if (!modal) return;
+        $('#uf_name').value = '';
+        $('#uf_email').value = '';
+        $('#uf_password').value = '';
+        const errBar = $('#userFormErr');
+        if (errBar) {
+          errBar.hidden = true;
+          errBar.textContent = '';
+        }
+        modal.hidden = false;
+        $('#uf_name')?.focus();
+      };
+
+      const closeModal = () => {
+        const modal = $('#userModal');
+        if (modal) modal.hidden = true;
+      };
+
+      rootEl.addEventListener('click', async e => {
+        if (e.target.closest('#btnTambahPengguna')) {
+          openModal();
+          return;
+        }
+        if (e.target.closest('#userModalClose') || e.target.closest('#userModalCancel')) {
+          closeModal();
+          return;
+        }
+
+        const delBtn = e.target.closest('[data-id], [data-e]');
+        if (delBtn && delBtn.tagName === 'BUTTON') {
+          const id = delBtn.dataset.id;
+          const email = delBtn.dataset.e;
+          const name = delBtn.dataset.n || email;
+          if (!confirm(`Hapus pengguna ${name} (${email})?`)) return;
+
+          try {
+            if (id) {
+              await api('admin/users.php?id=' + encodeURIComponent(id), { method: 'DELETE' });
+            } else {
+              sv('fh_users', users().filter(u => u.email !== email));
+            }
+            toast('Pengguna berhasil dihapus.');
+            await fetchUsers();
+          } catch (err) {
+            alert(err.message || 'Gagal menghapus pengguna.');
+          }
+        }
       });
 
-      draw();
+      rootEl.addEventListener('submit', async e => {
+        if (e.target.id !== 'userForm') return;
+        e.preventDefault();
+        const errBar = $('#userFormErr');
+        const name = $('#uf_name').value.trim();
+        const email = $('#uf_email').value.trim().toLowerCase();
+        const password = $('#uf_password').value;
+
+        if (name.length < 3 || name.length > 100) {
+          bar(errBar, 'Nama harus terdiri dari 3 hingga 100 karakter.');
+          return;
+        }
+        if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          bar(errBar, 'Format alamat email tidak valid.');
+          return;
+        }
+        if (password.length < 8 || password.length > 72) {
+          bar(errBar, 'Kata sandi minimal 8 dan maksimal 72 karakter.');
+          return;
+        }
+
+        try {
+          await api('admin/users.php', {
+            method: 'POST',
+            body: { name, email, password }
+          });
+          closeModal();
+          toast('Pengguna baru berhasil ditambahkan!');
+          await fetchUsers();
+        } catch (err) {
+          bar(errBar, err.message || 'Gagal menambahkan pengguna.');
+        }
+      });
+
+      await fetchUsers();
     }
   };
 
