@@ -854,6 +854,89 @@ X-CSRF-Token: <token_csrf_sesi>
 | `422` | Parameter `recipe_id` tidak ada, bukan integer, atau tidak valid |
 | `500` | Kesalahan internal server / basis data |
 
+## API rating & ulasan — 13
+
+### 1. Menulis atau memperbarui ulasan
+
+```http
+POST /FoodHub/backend/api/reviews.php
+Content-Type: application/json
+X-CSRF-Token: <token_csrf_sesi>
+```
+
+Endpoint terlindungi (`requireLogin()`). Mengizinkan pengguna memberi rating dan ulasan teks untuk resep yang tayang (`is_published = 1`). Database membatasi 1 ulasan per pengguna per resep (`uq_reviews_user_recipe`); jika pengguna mengirim kembali untuk resep yang sama, ulasan yang ada diperbarui (`ON DUPLICATE KEY UPDATE`).
+
+Contoh body:
+
+```json
+{
+  "recipe_id": 1,
+  "rating": 5,
+  "comment": "Rendang sangat empuk, bumbu meresap sempurna!"
+}
+```
+
+Aturan validasi:
+
+| Field | Tipe | Aturan |
+|---|---|---|
+| `recipe_id` | Integer | Wajib, bilangan bulat positif `1–4294967295`. Resep harus terdaftar dan tayang (`is_published = 1`). |
+| `rating` | Integer | Wajib, bilangan bulat antara 1 sampai 5. |
+| `comment` | String / Null | Opsional, maksimal 1000 karakter Unicode. |
+
+#### Respons berhasil — 200
+
+```json
+{
+  "message": "Ulasan berhasil dikirim.",
+  "review": {
+    "id": 1,
+    "recipe_id": 1,
+    "rating": 5,
+    "comment": "Rendang sangat empuk, bumbu meresap sempurna!",
+    "created_at": "2026-11-15 21:48:00"
+  }
+}
+```
+
+### 2. Membaca ulasan
+
+```http
+GET /FoodHub/backend/api/reviews.php?recipe_id=1
+```
+
+- Jika parameter `recipe_id` disertakan: mengembalikan ulasan untuk resep tersebut beserta nama pembuat (`user_name`).
+- Jika tanpa parameter `recipe_id`: mengembalikan daftar ulasan yang ditulis oleh pengguna yang sedang login.
+
+### 3. Menghapus ulasan
+
+```http
+DELETE /FoodHub/backend/api/reviews.php?recipe_id=1
+X-CSRF-Token: <token_csrf_sesi>
+```
+
+Menghapus ulasan yang ditulis pengguna yang sedang login untuk resep yang bersangkutan.
+
+#### Respons berhasil — 200
+
+```json
+{
+  "message": "Ulasan berhasil dihapus."
+}
+```
+
+#### Respons gagal
+
+| Status | Kondisi |
+|---|---|
+| `401` | Belum masuk / sesi tidak sah |
+| `403` | Header `X-CSRF-Token` hilang atau tidak cocok |
+| `404` | Resep tidak ditemukan atau disembunyikan |
+| `405` | Method selain GET, POST, DELETE (mis. PUT, PATCH) |
+| `415` | Content-Type bukan `application/json` pada POST |
+| `422` | `recipe_id` tidak valid, `rating` di luar 1–5, atau `comment` > 1000 karakter |
+| `500` | Kesalahan internal server / basis data |
+
 ## Pengujian otomatis
 
 Dari direktori utama proyek, jalankan:
@@ -909,5 +992,6 @@ Tes Node memakai VM/mock DOM/fetch untuk memeriksa kontrak autentikasi, fail-clo
 
 - Profil pengguna (11): membaca profil akun lengkap dari database, validasi nama 3–100 karakter dan bio opsional, penolakan manipulasi role/id/email, proteksi CSRF pada POST/PUT/PATCH, method DELETE ditolak 405.
 - Resep favorit (12): membaca daftar resep favorit terurut terbaru, menambah favorit dengan validasi status publikasi resep, menghapus favorit, proteksi CSRF pada POST/DELETE, method selain GET/POST/DELETE ditolak 405.
+- Rating & ulasan (13): menulis dan memperbarui ulasan (1 per member per resep), rating 1–5, validasi panjang komentar, membaca ulasan per resep/pengguna, menghapus ulasan, proteksi CSRF pada POST/DELETE.
 
-Autentikasi nomor 8, fondasi otorisasi/CSRF nomor 9, daftar resep 10A, detail resep 10B, API profil pengguna (11), dan API favorit resep (12) selesai. Pengelolaan ulasan dan admin belum diimplementasikan; endpoint terlindungi tersebut baru berupa guarded stub dengan status `501`.
+Autentikasi nomor 8, fondasi otorisasi/CSRF nomor 9, daftar resep 10A, detail resep 10B, API profil pengguna (11), API favorit resep (12), dan API rating & ulasan (13) selesai. Pengelolaan admin belum diimplementasikan; endpoint terlindungi tersebut baru berupa guarded stub dengan status `501`.

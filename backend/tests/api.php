@@ -498,7 +498,7 @@ PHP;
         ['/protected/member', $adminCookie, $adminCsrf, $adminUser, 200],
         ['/protected/admin', $adminCookie, $adminCsrf, $adminUser, 200],
     ];
-    $stubPaths = array_diff(array_keys($guardedPaths), ['/api/profile.php', '/api/favorites.php']);
+    $stubPaths = array_diff(array_keys($guardedPaths), ['/api/profile.php', '/api/favorites.php', '/api/reviews.php']);
     foreach ($stubPaths as $path) {
         if (str_starts_with($path, '/api/admin/')) {
             $allowedCases[] = [$path, $adminCookie, $adminCsrf, $adminUser, 501];
@@ -682,6 +682,65 @@ PHP;
     $favListEmpty = request($baseUrl, '/api/favorites.php', 'GET', null, 'application/json', $loginCookie);
     expect($favListEmpty['body']['recipes'] === [] && $favListEmpty['body']['total'] === 0, 'Daftar favorit kembali kosong setelah dihapus.');
     echo '[OK] Endpoint /api/favorites.php (GET, POST, DELETE) berhasil diuji secara komprehensif.', PHP_EOL;
+
+    // ---- Pengujian API Ulasan (/api/reviews.php) ----
+    // 1. GET ulasan awal (kosong)
+    $rvRes = request($baseUrl, '/api/reviews.php', 'GET', null, 'application/json', $loginCookie);
+    expect($rvRes['status'] === 200, 'GET /api/reviews.php mengembalikan status 200.');
+    expect(isset($rvRes['body']['reviews']) && is_array($rvRes['body']['reviews']), 'GET ulasan mengembalikan array reviews.');
+    expect($rvRes['body']['reviews'] === [], 'Ulasan pengguna awal masih kosong.');
+    expect(responseCsrfToken($rvRes) === $loginCsrf, 'GET ulasan menerbitkan token CSRF yang stabil.');
+
+    // 2. Method tidak diizinkan
+    foreach (['PUT', 'PATCH'] as $badMethod) {
+        $badMethodRes = request($baseUrl, '/api/reviews.php', $badMethod, '{}', 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]);
+        expectError($badMethodRes, 405, $badMethod . ' /api/reviews.php ditolak.');
+        expect(in_array('Allow: GET, POST, DELETE', $badMethodRes['headers'], true), 'Header Allow mencantumkan GET, POST, DELETE.');
+    }
+
+    // 3. Validasi mutasi POST ulasan
+    expectError(request($baseUrl, '/api/reviews.php', 'POST', '{"recipe_id":1,"rating":5}', 'application/json', $loginCookie), 403, 'POST ulasan tanpa CSRF ditolak.');
+    expectError(request($baseUrl, '/api/reviews.php', 'POST', '{"recipe_id":1,"rating":5}', 'application/json', $loginCookie, ['X-CSRF-Token' => 'salah']), 403, 'POST ulasan dengan CSRF salah ditolak.');
+    expectError(request($baseUrl, '/api/reviews.php', 'POST', 'recipe_id=1&rating=5', 'application/x-www-form-urlencoded', $loginCookie, ['X-CSRF-Token' => $loginCsrf]), 415, 'POST ulasan bukan JSON ditolak.');
+    expectError(request($baseUrl, '/api/reviews.php', 'POST', '{}', 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]), 422, 'POST ulasan tanpa recipe_id ditolak.');
+    expectError(request($baseUrl, '/api/reviews.php', 'POST', '{"recipe_id":"abc","rating":5}', 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]), 422, 'POST ulasan dengan recipe_id invalid ditolak.');
+    expectError(request($baseUrl, '/api/reviews.php', 'POST', '{"recipe_id":999999,"rating":5}', 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]), 404, 'POST ulasan untuk resep fiktif ditolak 404.');
+    expectError(request($baseUrl, '/api/reviews.php', 'POST', '{"recipe_id":1}', 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]), 422, 'POST ulasan tanpa rating ditolak.');
+    expectError(request($baseUrl, '/api/reviews.php', 'POST', '{"recipe_id":1,"rating":0}', 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]), 422, 'POST ulasan dengan rating 0 ditolak.');
+    expectError(request($baseUrl, '/api/reviews.php', 'POST', '{"recipe_id":1,"rating":6}', 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]), 422, 'POST ulasan dengan rating 6 ditolak.');
+    expectError(request($baseUrl, '/api/reviews.php', 'POST', '{"recipe_id":1,"rating":5,"comment":123}', 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]), 422, 'POST ulasan dengan komentar bukan teks ditolak.');
+    expectError(request($baseUrl, '/api/reviews.php', 'POST', json_encode(['recipe_id' => 1, 'rating' => 5, 'comment' => str_repeat('a', 1001)]), 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]), 422, 'POST ulasan dengan komentar > 1000 karakter ditolak.');
+
+    // 4. POST ulasan berhasil
+    $postRvRes = request($baseUrl, '/api/reviews.php', 'POST', json_encode(['recipe_id' => 1, 'rating' => 5, 'comment' => 'Sangat lezat!']), 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]);
+    expect($postRvRes['status'] === 200, 'POST /api/reviews.php berhasil dengan status 200.');
+    expect($postRvRes['body']['review']['rating'] === 5 && $postRvRes['body']['review']['comment'] === 'Sangat lezat!', 'Data ulasan tersimpan sesuai request.');
+    $stmt = $testPdo->prepare('SELECT rating, comment FROM reviews WHERE user_id = ? AND recipe_id = 1');
+    $stmt->execute([$user['id']]);
+    $savedRv = $stmt->fetch();
+    expect((int) $savedRv['rating'] === 5 && $savedRv['comment'] === 'Sangat lezat!', 'Ulasan benar-benar tersimpan di database.');
+
+    // 5. Update ulasan oleh user yang sama (ON DUPLICATE KEY UPDATE)
+    $updateRvRes = request($baseUrl, '/api/reviews.php', 'POST', json_encode(['recipe_id' => 1, 'rating' => 4, 'comment' => 'Update: Bumbu pas']), 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]);
+    expect($updateRvRes['status'] === 200 && $updateRvRes['body']['review']['rating'] === 4 && $updateRvRes['body']['review']['comment'] === 'Update: Bumbu pas', 'Ulasan berhasil diperbarui.');
+    $stmt = $testPdo->prepare('SELECT COUNT(*) FROM reviews WHERE user_id = ? AND recipe_id = 1');
+    $stmt->execute([$user['id']]);
+    expect((int) $stmt->fetchColumn() === 1, 'Hanya ada 1 ulasan per user per resep, tidak ada baris duplikat.');
+
+    // 6. GET ulasan per resep dan per user
+    $rvByRecipe = request($baseUrl, '/api/reviews.php?recipe_id=1', 'GET', null, 'application/json', $loginCookie);
+    expect($rvByRecipe['status'] === 200 && count($rvByRecipe['body']['reviews']) >= 1, 'GET ulasan per resep mengembalikan daftar ulasan.');
+    $rvByUser = request($baseUrl, '/api/reviews.php', 'GET', null, 'application/json', $loginCookie);
+    expect($rvByUser['status'] === 200 && count($rvByUser['body']['reviews']) === 1, 'GET ulasan user mengembalikan 1 ulasan milik pengguna.');
+
+    // 7. DELETE ulasan
+    expectError(request($baseUrl, '/api/reviews.php?recipe_id=1', 'DELETE', null, 'application/json', $loginCookie), 403, 'DELETE ulasan tanpa CSRF ditolak.');
+    expectError(request($baseUrl, '/api/reviews.php', 'DELETE', null, 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]), 422, 'DELETE ulasan tanpa query recipe_id ditolak.');
+    $delRvRes = request($baseUrl, '/api/reviews.php?recipe_id=1', 'DELETE', null, 'application/json', $loginCookie, ['X-CSRF-Token' => $loginCsrf]);
+    expect($delRvRes['status'] === 200, 'DELETE /api/reviews.php berhasil.');
+    $stmt->execute([$user['id']]);
+    expect((int) $stmt->fetchColumn() === 0, 'Ulasan di database terhapus.');
+    echo '[OK] Endpoint /api/reviews.php (GET, POST, DELETE) berhasil diuji secara komprehensif.', PHP_EOL;
 
     $switchLogin = request($baseUrl, '/auth?action=login', 'POST', json_encode($login, JSON_THROW_ON_ERROR));
     expect($switchLogin['status'] === 200 && $switchLogin['body'] === ['user' => $user], 'Login publik untuk uji pergantian akun tidak membutuhkan CSRF.');
