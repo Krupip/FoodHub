@@ -12,7 +12,11 @@ if (!in_array($action, ['register', 'login', 'me', 'logout'], true)) {
 
 if ($action === 'me') {
     requireRequestMethod('GET');
-    $user = getAuthenticatedUser();
+    try {
+        $user = getAuthenticatedUser();
+    } catch (Throwable $e) {
+        $user = null;
+    }
     if ($user === null) {
         discardAnonymousSession();
     } else {
