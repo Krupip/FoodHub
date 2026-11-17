@@ -179,6 +179,13 @@ function restoreRememberedUser(): ?array
 function getAuthenticatedUser(): ?array
 {
     startUserSession();
+    if (!empty($_SESSION['offline_demo']) && !empty($_SESSION['user_id'])) {
+        $uid = (int) $_SESSION['user_id'];
+        return $uid === 1
+            ? ['id' => 1, 'name' => 'Admin FoodHub', 'email' => 'admin@foodhub.id', 'role' => 'admin']
+            : ['id' => 2, 'name' => 'Raka Pratama', 'email' => 'raka@contoh.id', 'role' => 'member'];
+    }
+
     $userId = $_SESSION['user_id'] ?? null;
 
     if (is_int($userId) && $userId > 0) {
