@@ -10,8 +10,8 @@ Antarmuka web platform resep makanan digital Nusantara berbasis **HTML5**, **CSS
 frontend/
 ├── index.html               # Beranda: banner hero, pencarian cepat, 3 kartu resep populer
 ├── daftar-resep.html        # Katalog Resep: pencarian lengkap & filter kategori/waktu/level
-├── detail-resep.html        # Detail Resep: kalkulator porsi dinamis, bahan, langkah & ulasan
-├── faq.html                 # FAQ: panduan pengunjung, member, admin + tambah pertanyaan interaktif
+├── detail-resep.html        # Detail Resep: kalkulator porsi dinamis, bahan, & langkah memasak
+├── faq.html                 # FAQ: panduan terpadu penggunaan platform & kontak bantuan email
 ├── masuk.html               # Form login pengguna (member & admin)
 ├── daftar.html              # Form registrasi akun member baru
 ├── profil.html              # Profil akun: info pengguna & koleksi Resep Favorit tersimpan
@@ -44,14 +44,12 @@ Bagian ini menjelaskan antarmuka yang tersedia, **bukan klaim bahwa CRUD backend
 ### 2. Panduan Memasak Interaktif (`detail-resep.html`)
 - **Kalkulator Porsi Dinamis**: Mengubah jumlah porsi secara instan dengan tombol **`+`** atau **`−`**; seluruh takaran gram/ml setiap bahan dihitung ulang otomatis secara proporsional.
 - **UI Favorit**: Tombol simpan/hapus favorit dan koleksi di Profil tersedia; mutasi backend saat ini mengembalikan `501`, belum menyimpan favorit.
-- **UI Rating & Ulasan Bintang**: Form ulasan teks dan rating bintang 1–5 tersedia bagi pengguna yang masuk; pengiriman backend masih `501`.
+- **Panduan Terstruktur**: Tampilan bahan dengan checklist interaktif dan langkah memasak terurut. Fitur ulasan telah dihilangkan sesuai kebutuhan tampilan yang ringkas dan fokus.
 
-### 3. FAQ Interaktif & Manajemen Mandiri (`faq.html`)
-- **Filter Kategori Panduan**: Tombol *chip* untuk menyaring pertanyaan khusus **Pengunjung Umum**, **Member**, atau **Admin**.
-- **Fitur Tambah Pertanyaan Langsung dari Web**:
-  - Tombol **`+ Tambah Pertanyaan`** membuka formulir jendela pop-up (*modal dialog*).
-  - Pengguna dapat memilih kategori target (*Pengunjung, Member, Admin*), mengetik pertanyaan, dan menuliskan jawabannya.
-  - Pertanyaan baru langsung tampil seketika di kategori yang sesuai dengan gaya kartu *accordion* seragam (bisa diklik buka-tutup) dan dilengkapi tombol **Hapus** untuk menghapusnya kapan saja (tersimpan di `localStorage`).
+### 3. FAQ Terpadu & Kontak Bantuan (`faq.html`)
+- **Daftar Pertanyaan Terpadu**: Pertanyaan umum seputar penggunaan platform disajikan dalam satu daftar *accordion* bersih dan rapi tanpa pemisahan kategori yang membingungkan.
+- **Fokus Pengguna & Member**: Memuat jawaban esensial mengenai fitur pencarian, bahan, porsi dinamis, akun, dan resep favorit.
+- **Kontak Bantuan Email**: Tersedia tombol dan tautan kontak langsung (`mailto:kontak@foodhub.id`) bagi pengguna yang memerlukan bantuan lebih lanjut.
 
 ### 4. Akun & Profil Pengguna (`profil.html`)
 - Melihat informasi akun yang sedang masuk (nama, email, peran, tanggal bergabung).
@@ -60,6 +58,7 @@ Bagian ini menjelaskan antarmuka yang tersedia, **bukan klaim bahwa CRUD backend
 
 ### 5. Panel Pengelola Admin (`admin/`)
 - **Kelola Resep**:
+  - **Fitur Pencarian Resep (Search)**: Bilah pencarian *real-time* untuk menemukan resep secara cepat berdasarkan nama resep, asal daerah, kategori, maupun deskripsi tanpa memuat ulang halaman.
   - **Tambah Resep Baru**: Dialog formulir modal lengkap terhubung ke `POST /api/admin/recipes.php`.
   - **Edit Resep**: Membuka data resep ke formulir modal dan menyimpan pembaruan ke `PUT /api/admin/recipes.php`.
   - **Hapus Resep**: Tombol dan konfirmasi hapus terhubung ke `DELETE /api/admin/recipes.php`.

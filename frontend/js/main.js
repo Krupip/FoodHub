@@ -1066,132 +1066,7 @@
     },
 
     faq() {
-      const chips = $$('#faqFilter .chip');
-      const groups = $$('.faq-group');
-      const modal = $('#modalFaq');
-      const form = $('#formTambahFaq');
-      const btnBuka = $('#btnBukaModalFaq');
-      const btnTutup = $('#btnTutupFaq');
-      const btnBatal = $('#btnBatalFaq');
-
-      const FAQ_KEY = 'fh_custom_faqs';
-      const getCustomFaqs = () => ld(FAQ_KEY, []);
-      const saveCustomFaqs = list => sv(FAQ_KEY, list);
-
-      const renderCustomFaqs = () => {
-        const list = getCustomFaqs();
-        $$('.faq-custom-container').forEach(c => { c.innerHTML = ''; });
-
-        list.forEach(item => {
-          const container = $(`[data-custom-group="${item.group}"]`);
-          if (!container) return;
-
-          const details = document.createElement('details');
-          details.className = 'faq-item-custom';
-          details.innerHTML = `
-            <summary>
-              <span>${esc(item.q)}</span>
-            </summary>
-            <div>
-              <p>${esc(item.a)}</p>
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.8rem;padding-top:.5rem;border-top:1px dashed var(--line);font-size:.82rem">
-                <span class="muted"><span class="tag" style="font-size:.7rem;padding:.1em .5em">Kustom</span> Ditambahkan langsung</span>
-                <button type="button" class="btn danger sm" data-del-faq="${item.id}" style="padding:.2rem .6rem;font-size:.78rem">
-                  ${ic('trash')} Hapus
-                </button>
-              </div>
-            </div>
-          `;
-          container.appendChild(details);
-        });
-      };
-
-      const openModal = () => {
-        if (!modal) return;
-        const activeChip = $('#faqFilter .chip.on');
-        const activeCat = activeChip ? activeChip.dataset.cat : 'all';
-        if (activeCat && activeCat !== 'all' && $('#faqKat')) {
-          $('#faqKat').value = activeCat;
-        }
-        form?.reset();
-        modal.hidden = false;
-        $('#faqTanya')?.focus();
-      };
-
-      const closeModal = () => {
-        if (modal) modal.hidden = true;
-      };
-
-      if (btnBuka) btnBuka.addEventListener('click', openModal);
-      if (btnTutup) btnTutup.addEventListener('click', closeModal);
-      if (btnBatal) btnBatal.addEventListener('click', closeModal);
-      if (modal) {
-        modal.addEventListener('click', e => {
-          if (e.target === modal) closeModal();
-        });
-      }
-
-      if (form) {
-        form.addEventListener('submit', e => {
-          e.preventDefault();
-          const q = $('#faqTanya').value.trim();
-          const a = $('#faqJawab').value.trim();
-          const group = $('#faqKat').value;
-
-          if (!q || !a) {
-            toast('Pertanyaan dan jawaban wajib diisi.');
-            return;
-          }
-
-          const current = getCustomFaqs();
-          const newFaq = {
-            id: Date.now(),
-            group,
-            q,
-            a,
-            created_at: new Date().toISOString()
-          };
-          current.push(newFaq);
-          saveCustomFaqs(current);
-
-          renderCustomFaqs();
-          closeModal();
-          toast('Pertanyaan FAQ baru berhasil ditambahkan!');
-
-          const activeChip = $('#faqFilter .chip.on');
-          if (activeChip && activeChip.dataset.cat !== 'all' && activeChip.dataset.cat !== group) {
-            const targetChip = $(`#faqFilter .chip[data-cat="${group}"]`);
-            if (targetChip) targetChip.click();
-          }
-        });
-      }
-
-      document.addEventListener('click', e => {
-        const delBtn = e.target.closest('[data-del-faq]');
-        if (!delBtn) return;
-        const id = +delBtn.dataset.delFaq;
-        if (!confirm('Apakah Anda yakin ingin menghapus pertanyaan ini?')) return;
-
-        const current = getCustomFaqs();
-        saveCustomFaqs(current.filter(x => x.id !== id));
-        renderCustomFaqs();
-        toast('Pertanyaan FAQ berhasil dihapus.');
-      });
-
-      if (chips.length) {
-        chips.forEach(btn => {
-          btn.addEventListener('click', () => {
-            chips.forEach(b => b.classList.remove('on'));
-            btn.classList.add('on');
-            const cat = btn.dataset.cat;
-            groups.forEach(g => {
-              g.hidden = !(cat === 'all' || g.dataset.group === cat);
-            });
-          });
-        });
-      }
-
-      renderCustomFaqs();
+      // Halaman FAQ menggunakan daftar accordion terpadu statis
     },
 
     async 'detail-resep'() {
@@ -1207,7 +1082,7 @@
         const res = await api('recipes.php?id=' + encodeURIComponent(id));
         r = res && res.recipe;
         if (!r || typeof r.title !== 'string' || !Array.isArray(r.categories) ||
-            !Array.isArray(r.ingredients) || !Array.isArray(r.steps) || !Array.isArray(r.reviews)) {
+            !Array.isArray(r.ingredients) || !Array.isArray(r.steps)) {
           throw new Error('Respons detail resep tidak valid.');
         }
       } catch (e) {
@@ -1224,7 +1099,6 @@
       const baseServings = r.servings || r.s || 4;
       const ingredients = r.ingredients || (r.b || []).map(x => Array.isArray(x) ? { name: x[0], quantity: x[1], unit: x[2] } : x);
       const steps = r.steps || r.t || [];
-      const reviews = r.reviews || (rvAll()[r.id] || []).map(v => ({ user_name: v.u || 'Pengguna', rating: v.s, comment: v.c, created_at: v.at }));
       const story = r.story || r.c || '';
       const cookTime = r.cook_time_minutes || r.w || 30;
       const diff = r.difficulty ? (r.difficulty.charAt(0).toUpperCase() + r.difficulty.slice(1)) : (r.l || 'Sedang');
@@ -1295,40 +1169,6 @@
             <ol class="steps">
               ${steps.map(s => `<li><span>${esc(s)}</span></li>`).join('')}
             </ol>
-
-            <h2 style="margin-top:2rem">Ulasan dan rating</h2>
-            <div id="rf">
-              ${U ? `
-                <form id="rvForm" style="margin-bottom:1.5rem">
-                  <div class="err" id="re" hidden></div>
-                  <div class="fld">
-                    <label>Beri rating</label>
-                    <div class="stars">
-                      ${[1, 2, 3, 4, 5].map(v => `<button type="button" data-val="${v}">★</button>`).join('')}
-                    </div>
-                  </div>
-                  <div class="fld">
-                    <label for="rc">Ulasan Anda</label>
-                    <textarea id="rc" rows="2" placeholder="Bagikan pengalaman memasak Anda..."></textarea>
-                  </div>
-                  <button class="btn sm" type="submit">Kirim Ulasan</button>
-                </form>
-              ` : `
-                <p class="muted sm"><a href="masuk.html?next=detail-resep.html?id=${encodeURIComponent(id)}"><b>Masuk</b></a> untuk memberikan ulasan dan rating.</p>
-              `}
-            </div>
-            <div id="rl">
-              ${reviews.length ? reviews.map(rv => `
-                <div class="rev">
-                  <div style="display:flex;justify-content:space-between;margin-bottom:.3rem">
-                    <strong>${esc(rv.user_name || rv.name || 'Pengguna')}</strong>
-                    <span class="gold">★ ${rv.rating || rv.s}</span>
-                  </div>
-                  <p style="margin:0;font-size:.92rem">${esc(rv.comment || rv.c || '')}</p>
-                  <small class="muted">${esc((rv.created_at || rv.at || '').slice(0, 10))}</small>
-                </div>
-              `).join('') : '<p class="empty" style="padding:1rem 0">Belum ada ulasan untuk resep ini.</p>'}
-            </div>
           </div>
         </div>
       `;
@@ -1380,31 +1220,6 @@
           toast('Tautan resep disalin ke papan klip!');
         } else {
           toast('Tautan: ' + location.href);
-        }
-      });
-
-      // Bintang ulasan
-      let selectedStars = 5;
-      $$('.stars button').forEach((btn, idx) => {
-        if (idx === 4) btn.classList.add('on');
-        btn.addEventListener('click', () => {
-          selectedStars = idx + 1;
-          $$('.stars button').forEach((b, i) => b.classList.toggle('on', i <= idx));
-        });
-      });
-
-      $('#rvForm')?.addEventListener('submit', async e => {
-        e.preventDefault();
-        const comment = $('#rc').value.trim();
-        try {
-          await api('reviews.php', {
-            method: 'POST',
-            body: { recipe_id: id, rating: selectedStars, comment }
-          });
-          toast('Ulasan berhasil dikirim!');
-          location.reload();
-        } catch (err) {
-          bar($('#re'), err.message || 'Gagal mengirim ulasan.');
         }
       });
     },
@@ -1665,6 +1480,8 @@
       if (!rootEl) return;
 
       let list = [];
+      let searchQuery = '';
+
       const loadData = async () => {
         try {
           const res = await api('admin/recipes.php');
@@ -1673,6 +1490,83 @@
           list = recipesList();
         }
         draw();
+      };
+
+      const renderTableRows = () => {
+        const tbody = $('#resepTableBody');
+        const countEl = $('#searchResultCount');
+        if (!tbody) return;
+
+        const q = searchQuery.toLowerCase().trim();
+        const filtered = q ? list.filter(r => {
+          const title = (r.title || r.n || '').toLowerCase();
+          const region = (r.region || r.p || '').toLowerCase();
+          const cats = (r.categories || r.k || []).join(' ').toLowerCase();
+          const desc = (r.story || r.c || '').toLowerCase();
+          return title.includes(q) || region.includes(q) || cats.includes(q) || desc.includes(q);
+        }) : list;
+
+        if (countEl) {
+          countEl.textContent = q ? `Menampilkan ${filtered.length} dari ${list.length} resep` : '';
+        }
+
+        if (!filtered.length) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="7" class="muted" style="text-align:center;padding:2.5rem 1rem">
+                ${q ? `Tidak ada resep yang sesuai dengan kata kunci "<b>${esc(searchQuery)}</b>".` : 'Belum ada resep.'}
+              </td>
+            </tr>
+          `;
+          return;
+        }
+
+        tbody.innerHTML = filtered.map(r => {
+          const isPub = r.is_published !== false && !hid().includes(r.id);
+          const title = r.title || r.n;
+          const region = r.region || r.p || '-';
+          const catsList = (r.categories || r.k || []);
+          const time = r.cook_time_minutes || r.w || 30;
+          const servings = r.servings || r.s || 4;
+          const imgUrl = (r.image_path || r.f) ? (R + esc(r.image_path || r.f)) : '';
+          const desc = r.story || r.c || '';
+
+          return `
+            <tr>
+              <td>
+                ${imgUrl
+                  ? `<img class="t-thumb" src="${imgUrl}" alt="${esc(title)}">`
+                  : `<div class="t-thumb" style="display:grid;place-items:center">${ic('bowl')}</div>`
+                }
+              </td>
+              <td>
+                <strong>${esc(title)}</strong>
+                ${desc ? `<div class="muted sm" style="max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(desc)}</div>` : ''}
+              </td>
+              <td>${esc(region)}</td>
+              <td>${catsList.map(k => `<span class="tag">${esc(k)}</span>`).join(' ')}</td>
+              <td>${time} mnt · ${servings} porsi</td>
+              <td>
+                <span class="sts ${isPub ? 'disetujui' : 'ditolak'}">
+                  ${isPub ? 'tayang' : 'disembunyikan'}
+                </span>
+              </td>
+              <td>
+                <div class="act-btns">
+                  <button class="btn ghost sm" type="button" data-edit="${r.id}" title="Edit resep">
+                    ${ic('edit')} Edit
+                  </button>
+                  <button class="btn danger sm" type="button" data-del="${r.id}" title="Hapus resep">
+                    ${ic('trash')} Hapus
+                  </button>
+                  <button class="btn sm ${isPub ? 'ghost' : ''}" type="button" data-toggle="${r.id}" data-pub="${isPub ? '1' : '0'}" title="${isPub ? 'Sembunyikan' : 'Tampilkan'}">
+                    ${isPub ? 'Sembunyi' : 'Tayang'}
+                  </button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
       };
 
       const draw = () => {
@@ -1697,6 +1591,13 @@
             <div class="panel"><b>${hidden}</b>Disembunyikan</div>
           </div>
 
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin:1.4rem 0 1rem">
+            <div class="searchbar" style="margin:0;flex:1;max-width:440px">
+              <input type="search" id="resepSearch" placeholder="Cari resep (nama, daerah, kategori)..." value="${esc(searchQuery)}">
+            </div>
+            <span class="muted sm" id="searchResultCount"></span>
+          </div>
+
           <div class="tw">
             <table>
               <thead>
@@ -1710,54 +1611,7 @@
                   <th style="width:240px">Aksi</th>
                 </tr>
               </thead>
-              <tbody>
-                ${list.map(r => {
-                  const isPub = r.is_published !== false && !hid().includes(r.id);
-                  const title = r.title || r.n;
-                  const region = r.region || r.p || '-';
-                  const catsList = (r.categories || r.k || []);
-                  const time = r.cook_time_minutes || r.w || 30;
-                  const servings = r.servings || r.s || 4;
-                  const imgUrl = (r.image_path || r.f) ? (R + esc(r.image_path || r.f)) : '';
-                  const desc = r.story || r.c || '';
-
-                  return `
-                    <tr>
-                      <td>
-                        ${imgUrl
-                          ? `<img class="t-thumb" src="${imgUrl}" alt="${esc(title)}">`
-                          : `<div class="t-thumb" style="display:grid;place-items:center">${ic('bowl')}</div>`
-                        }
-                      </td>
-                      <td>
-                        <strong>${esc(title)}</strong>
-                        ${desc ? `<div class="muted sm" style="max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(desc)}</div>` : ''}
-                      </td>
-                      <td>${esc(region)}</td>
-                      <td>${catsList.map(k => `<span class="tag">${esc(k)}</span>`).join(' ')}</td>
-                      <td>${time} mnt · ${servings} porsi</td>
-                      <td>
-                        <span class="sts ${isPub ? 'disetujui' : 'ditolak'}">
-                          ${isPub ? 'tayang' : 'disembunyikan'}
-                        </span>
-                      </td>
-                      <td>
-                        <div class="act-btns">
-                          <button class="btn ghost sm" type="button" data-edit="${r.id}" title="Edit resep">
-                            ${ic('edit')} Edit
-                          </button>
-                          <button class="btn danger sm" type="button" data-del="${r.id}" title="Hapus resep">
-                            ${ic('trash')} Hapus
-                          </button>
-                          <button class="btn sm ${isPub ? 'ghost' : ''}" type="button" data-toggle="${r.id}" data-pub="${isPub ? '1' : '0'}" title="${isPub ? 'Sembunyikan' : 'Tampilkan'}">
-                            ${isPub ? 'Sembunyi' : 'Tayang'}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
+              <tbody id="resepTableBody"></tbody>
             </table>
           </div>
 
@@ -1858,6 +1712,7 @@
             </div>
           </div>
         `;
+        renderTableRows();
       };
 
       const openModal = async (recipe) => {
@@ -2022,6 +1877,13 @@
 
         closeModal();
         loadData();
+      });
+
+      rootEl.addEventListener('input', e => {
+        if (e.target.id === 'resepSearch') {
+          searchQuery = e.target.value;
+          renderTableRows();
+        }
       });
 
       loadData();

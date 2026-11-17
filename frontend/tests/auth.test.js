@@ -245,7 +245,7 @@ test('detail resep menampilkan respons API dan rating null tidak mengambil ratin
   await h.app.PG['detail-resep']();
   const html = h.get('dr').innerHTML;
   assert.match(html, /Resep API &lt;aman&gt;/);
-  for (const text of ['Penulis API', 'Bahan API', 'Langkah API', 'Kategori API', 'Cerita API', 'Tersimpan di Favorit', 'Belum ada ulasan']) {
+  for (const text of ['Penulis API', 'Bahan API', 'Langkah API', 'Kategori API', 'Cerita API', 'Tersimpan di Favorit']) {
     assert.ok(html.includes(text), text);
   }
   assert.match(html, /id="rt">★ -<\/b>/);

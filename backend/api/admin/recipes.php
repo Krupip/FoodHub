@@ -191,15 +191,25 @@ if ($requestMethod === 'GET') {
         ]);
     }
 
+    $search = readQueryString('q', 100) ?? readQueryString('search', 100);
+    $params = [];
+    $whereClause = '';
+    if ($search !== null) {
+        $whereClause = ' WHERE (v.title LIKE ? OR v.region LIKE ? OR r.story LIKE ?)';
+        $keyword = '%' . $search . '%';
+        $params = [$keyword, $keyword, $keyword];
+    }
+
     $stmt = $pdo->prepare(
-        'SELECT v.id, v.title, v.slug, v.region, r.story, v.image_path, v.cook_time_minutes,
+        "SELECT v.id, v.title, v.slug, v.region, r.story, v.image_path, v.cook_time_minutes,
                 v.difficulty, v.servings, v.is_published, v.created_at,
                 v.avg_rating, v.review_count, v.favorite_count
          FROM v_recipe_cards v
          JOIN recipes r ON r.id = v.id
-         ORDER BY v.created_at DESC, v.id DESC'
+         {$whereClause}
+         ORDER BY v.created_at DESC, v.id DESC"
     );
-    $stmt->execute();
+    $stmt->execute($params);
     $rows = $stmt->fetchAll();
 
     $categoriesByRecipe = [];

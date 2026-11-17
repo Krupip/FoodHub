@@ -17,31 +17,11 @@
     <div class="container narrow faq">
       <div class="ph">
         <h1>Pertanyaan Umum (FAQ)</h1>
-        <p>Panduan lengkap penggunaan platform FoodHub untuk Pengunjung, Member, dan Admin.</p>
+        <p>Pertanyaan yang sering diajukan seputar penggunaan platform FoodHub.</p>
       </div>
 
-      <!-- Filter Kategori FAQ & Tombol Tambah Pertanyaan -->
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin:1rem 0 2rem">
-        <div class="chips" id="faqFilter" style="margin:0">
-          <button class="chip on" data-cat="all" type="button">Semua Pertanyaan</button>
-          <button class="chip" data-cat="umum" type="button">Pengunjung</button>
-          <button class="chip" data-cat="member" type="button">Member</button>
-          <button class="chip" data-cat="admin" type="button">Admin</button>
-        </div>
-        <button class="btn sm" id="btnBukaModalFaq" type="button">
-          <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          Tambah Pertanyaan
-        </button>
-      </div>
-
-      <!-- Kategori 1: Pengunjung Umum -->
-      <div class="faq-group" data-group="umum">
-        <h2 style="font-size:1.35rem;margin:1.8rem 0 1rem;display:flex;align-items:center;gap:.6rem">
-          <span class="tag">Umum</span> Pertanyaan Pengunjung
-        </h2>
-
-        <div class="faq-custom-container" data-custom-group="umum"></div>
-
+      <!-- Daftar Pertanyaan FAQ Terpadu -->
+      <div class="faq-list" style="margin-top:1.5rem">
         <details>
           <summary>Apa itu FoodHub?</summary>
           <p>FoodHub adalah platform resep makanan digital Nusantara untuk mencari, mempelajari, dan menyimpan resep dengan takaran bahan yang jelas dan terukur.</p>
@@ -61,24 +41,15 @@
           <summary>Apakah FoodHub menyediakan layanan pesan antar atau menghitung kalori?</summary>
           <p>Tidak. FoodHub murni merupakan platform panduan resep memasak, tanpa fitur transaksi jual beli bahan, pemesanan makanan siap saji, maupun kalkulator gizi medis.</p>
         </details>
-      </div>
-
-      <!-- Kategori 2: Fitur Member -->
-      <div class="faq-group" data-group="member">
-        <h2 style="font-size:1.35rem;margin:2.4rem 0 1rem;display:flex;align-items:center;gap:.6rem">
-          <span class="tag g">Member</span> Fitur Pengguna Terdaftar
-        </h2>
-
-        <div class="faq-custom-container" data-custom-group="member"></div>
 
         <details>
           <summary>Apa keuntungan mendaftar sebagai Member?</summary>
-          <p>Sebagai Member, Anda dapat menyimpan resep ke daftar favorit pribadi, memberikan ulasan dan rating bintang pada resep yang pernah Anda coba, serta mengelola data profil Anda.</p>
+          <p>Sebagai Member, Anda dapat menyimpan resep ke daftar favorit pribadi serta mengelola data profil Anda.</p>
         </details>
 
         <details>
           <summary>Bagaimana cara mengatur takaran bahan sesuai jumlah porsi?</summary>
-          <p>Buka halaman <b>Detail Resep</b>, lalu pada kotak <b>Bahan-bahan</b> klik tombol plus (<b>+</b>) atau minus (<b>−</b>). Jumlah takaran gram/ml setiap bahan akan dihitung ulang dan bertambah atau berkurang secara otomatis.</p>
+          <p>Buka halaman <b>Detail Resep</b>, lalu pada kotak <b>Bahan-bahan</b> klik tombol plus (<b>+</b>) atau minus (<b>−</b>). Jumlah takaran setiap bahan akan dihitung ulang dan disesuaikan secara otomatis.</p>
         </details>
 
         <details>
@@ -87,83 +58,19 @@
         </details>
 
         <details>
-          <summary>Bagaimana cara memberikan rating dan ulasan?</summary>
-          <p>Pada halaman Detail Resep, gulir ke bagian <b>Ulasan dan rating</b>. Pilih bintang 1 hingga 5, tuliskan ulasan pengalaman memasak Anda pada kolom komentar, lalu klik <b>Kirim Ulasan</b>.</p>
-        </details>
-
-        <details>
           <summary>Bagaimana cara mengubah nama profil saya?</summary>
           <p>Buka menu <b>Profil &gt; Informasi Profil</b>, ubah nama tampilan Anda pada formulir yang tersedia, lalu klik tombol <b>Simpan perubahan</b>.</p>
         </details>
       </div>
 
-      <!-- Kategori 3: Panduan Admin -->
-      <div class="faq-group" data-group="admin">
-        <h2 style="font-size:1.35rem;margin:2.4rem 0 1rem;display:flex;align-items:center;gap:.6rem">
-          <span class="tag r">Admin</span> Panduan Pengelola (Admin)
-        </h2>
-
-        <div class="faq-custom-container" data-custom-group="admin"></div>
-
-        <details>
-          <summary>Bagaimana cara admin mengakses Dasbor Admin?</summary>
-          <p>Masuk menggunakan akun admin (email: <code style="background:var(--sand);padding:.1em .4em;border-radius:4px">admin@foodhub.id</code>), kemudian klik menu avatar akun di pojok kanan atas navigasi dan pilih <b>Dasbor Admin</b>.</p>
-        </details>
-
-        <details>
-          <summary>Bagaimana cara menambah resep baru ke katalog?</summary>
-          <p>Di Panel Admin, buka menu <b>Kelola Resep</b>, lalu klik tombol <b>+ Tambah Resep</b>. Lengkapi formulir (nama resep, asal daerah, kategori, waktu memasak, tingkat kesulitan, porsi, foto, deskripsi, bahan-bahan, dan langkah memasak), lalu klik <b>Simpan Resep</b>. Resep baru akan langsung tayang di katalog publik.</p>
-        </details>
-
-        <details>
-          <summary>Bagaimana cara mengedit atau menghapus resep?</summary>
-          <p>Pada tabel <b>Kelola Resep</b>, klik tombol <b>Edit</b> pada baris resep yang ingin diubah datanya. Untuk menghapus resep dari sistem secara permanen, klik tombol <b>Hapus</b> lalu konfirmasi pada dialog pop-up.</p>
-        </details>
-
-        <details>
-          <summary>Bagaimana cara menyembunyikan atau menayangkan resep (moderasi)?</summary>
-          <p>Pada tabel <b>Kelola Resep</b>, klik tombol <b>Sembunyi / Tayang</b>. Resep dengan status <i>disembunyikan</i> (kolom <code style="background:var(--sand);padding:.1em .4em;border-radius:4px">is_published = 0</code>) tidak akan muncul di Beranda maupun pencarian Daftar Resep bagi pengunjung publik.</p>
-        </details>
-
-        <details>
-          <summary>Bagaimana cara mengelola akun pengguna?</summary>
-          <p>Masuk ke menu <b>Kelola Pengguna</b> pada sidebar admin untuk melihat seluruh akun yang terdaftar (nama, email, peran, tanggal bergabung) dan menghapus akun member jika diperlukan.</p>
-        </details>
-      </div>
-    </div>
-
-    <!-- Modal Tambah Pertanyaan FAQ -->
-    <div class="modal-backdrop" id="modalFaq" hidden>
-      <div class="modal-box" style="max-width:540px">
-        <div class="modal-h">
-          <h2 style="font-size:1.35rem;margin:0">Tambah Pertanyaan FAQ</h2>
-          <button class="modal-close" id="btnTutupFaq" type="button" aria-label="Tutup">&times;</button>
-        </div>
-        <form id="formTambahFaq" style="display:flex;flex-direction:column;gap:1.1rem;margin-top:1rem">
-          <div>
-            <label for="faqKat" style="display:block;font-weight:600;margin-bottom:.4rem">Kategori Pertanyaan</label>
-            <select id="faqKat" required style="width:100%;padding:.7rem;border:2px solid var(--ink);border-radius:12px;font:inherit;background:#fff">
-              <option value="umum">Pengunjung (Umum)</option>
-              <option value="member" selected>Member (Pengguna Terdaftar)</option>
-              <option value="admin">Admin (Pengelola)</option>
-            </select>
-          </div>
-
-          <div>
-            <label for="faqTanya" style="display:block;font-weight:600;margin-bottom:.4rem">Pertanyaan</label>
-            <input id="faqTanya" type="text" placeholder="Contoh: Bagaimana cara membatalkan simpan resep favorit?" required style="width:100%;padding:.7rem;border:2px solid var(--ink);border-radius:12px;font:inherit;background:#fff">
-          </div>
-
-          <div>
-            <label for="faqJawab" style="display:block;font-weight:600;margin-bottom:.4rem">Jawaban Lengkap</label>
-            <textarea id="faqJawab" rows="4" placeholder="Tuliskan jawaban atau panduan langkah-langkah di sini..." required style="width:100%;padding:.7rem;border:2px solid var(--ink);border-radius:12px;font:inherit;background:#fff;resize:vertical"></textarea>
-          </div>
-
-          <div style="display:flex;gap:.8rem;justify-content:flex-end;margin-top:.6rem">
-            <button class="btn ghost sm" type="button" id="btnBatalFaq">Batal</button>
-            <button class="btn sm" type="submit">Simpan Pertanyaan</button>
-          </div>
-        </form>
+      <!-- Kontak Bantuan -->
+      <div class="panel" style="margin-top:2.5rem;text-align:center;padding:2.2rem 1.5rem">
+        <h2 style="font-size:1.3rem;margin:0 0 .5rem">Masih punya pertanyaan?</h2>
+        <p class="muted" style="margin:0 0 1.2rem">Tim FoodHub siap membantu Anda. Jangan ragu untuk menghubungi kami melalui email:</p>
+        <a class="btn" href="mailto:kontak@foodhub.id" style="display:inline-flex;align-items:center;gap:.6rem;font-size:1rem;padding:.75rem 1.6rem">
+          <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          kontak@foodhub.id
+        </a>
       </div>
     </div>
   </main>

@@ -9,7 +9,7 @@ FoodHub adalah aplikasi web platform resep makanan digital Nusantara yang dibang
 ### 1. Eksplorasi & Katalog Resep
 - **Pencarian & Multi-Filter:** Pencarian nama resep atau bahan secara real-time dengan filter kategori masakan, batas waktu memasak, dan tingkat kesulitan.
 - **Katalog Responsif:** Grid kartu resep dengan foto, asal daerah, durasi memasak, dan rating rata-rata bintang.
-- **Detail Resep Interaktif:** Kalkulator porsi dinamis (perhitungan proporsional bahan otomatis), langkah memasak terurut, serta ulasan dan rating pengguna.
+- **Detail Resep Interaktif:** Kalkulator porsi dinamis (perhitungan proporsional bahan otomatis) dan langkah memasak terurut.
 
 ### 2. Autentikasi & Keamanan Sesi
 - **Registrasi & Login:** Berbasis sesi aman di database dengan password hashing (`PASSWORD_DEFAULT`), normalisasi input, dan proteksi role.
@@ -24,7 +24,7 @@ FoodHub adalah aplikasi web platform resep makanan digital Nusantara yang dibang
 
 ### 4. Panel Pengelola Admin (`/admin/`)
 - **Dasbor Statistik:** Ringkasan statistik real-time dari database (total resep, resep tayang, resep disembunyikan, dan total pengguna).
-- **Kelola Resep:** Menambah resep baru via formulir modal lengkap, memperbarui resep, dan menghapus resep (cascade delete bahan, langkah, favorit, dan ulasan).
+- **Kelola Resep:** Fitur pencarian resep secara real-time (*search*), menambah resep baru via formulir modal lengkap, memperbarui resep, dan menghapus resep (cascade delete bahan, langkah, dan favorit).
 - **Moderasi Resep:** Mengubah status tayang/sembunyi (*Publish/Hide*) resep secara instan.
 - **Kelola Pengguna:** Melihat daftar seluruh akun pengguna, menambahkan akun pengguna baru dengan validasi email duplikat, dan menghapus akun member (dengan proteksi anti-hapus admin).
 
