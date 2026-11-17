@@ -480,6 +480,7 @@ section.container {
 
 .sc.gold {
   background: var(--gold);
+  color: #fff;
 }
 
 /* ==========================================================================
