@@ -80,6 +80,8 @@
     let body = opts.body;
     if (body && typeof body === 'object' && !(body instanceof FormData)) {
       body = JSON.stringify(body);
+    } else if (body instanceof FormData) {
+      delete headers['Content-Type'];
     }
 
     const res = await fetch(API_BASE + path, { ...opts, method, credentials: 'same-origin', headers, body });
@@ -740,7 +742,7 @@
     const ratingVal = r.avg_rating != null ? r.avg_rating : (rat(r) ? rat(r).a : null);
     const ratingTxt = ratingVal ? ('★ ' + Number(ratingVal).toFixed(1)) : 'Belum ada rating';
     const imgFile = r.image_path || r.f || '';
-    const imgUrl = imgFile ? (R + esc(imgFile)) : '';
+    const imgUrl = imgFile ? (/^(https?:\/\/|data:image\/)/i.test(imgFile) ? imgFile : (R + esc(imgFile))) : '';
 
     return `
       <a class="card" href="${R}detail-resep.html?id=${encodeURIComponent(r.id)}">
@@ -1528,7 +1530,8 @@
           const catsList = (r.categories || r.k || []);
           const time = r.cook_time_minutes || r.w || 30;
           const servings = r.servings || r.s || 4;
-          const imgUrl = (r.image_path || r.f) ? (R + esc(r.image_path || r.f)) : '';
+          const rawImg = r.image_path || r.f;
+          const imgUrl = rawImg ? (/^(https?:\/\/|data:image\/)/i.test(rawImg) ? rawImg : (R + esc(rawImg))) : '';
           const desc = r.story || r.c || '';
 
           return `
@@ -1667,25 +1670,56 @@
                     <input type="number" id="rf_s" min="1" value="4">
                   </div>
                   <div class="fld">
-                    <label for="rf_f">Foto Resep</label>
-                    <select id="rf_f">
-                      <option value="img/rendang.jpg">Rendang (img/rendang.jpg)</option>
-                      <option value="img/gulai-itiak.jpg">Gulai Itiak (img/gulai-itiak.jpg)</option>
-                      <option value="img/sate-padang.jpg">Sate Padang (img/sate-padang.jpg)</option>
-                      <option value="img/pempek.jpg">Pempek (img/pempek.jpg)</option>
-                      <option value="img/soto-lamongan.jpg">Soto Lamongan (img/soto-lamongan.jpg)</option>
-                      <option value="img/rawon.jpg">Rawon (img/rawon.jpg)</option>
-                      <option value="img/gudeg.jpg">Gudeg (img/gudeg.jpg)</option>
-                      <option value="img/sate-lilit.jpg">Sate Lilit (img/sate-lilit.jpg)</option>
-                      <option value="img/ayam-betutu.jpg">Ayam Betutu (img/ayam-betutu.jpg)</option>
-                      <option value="img/gado-gado.jpg">Gado-Gado (img/gado-gado.jpg)</option>
-                      <option value="img/es-cendol.jpg">Es Cendol (img/es-cendol.jpg)</option>
-                      <option value="img/nasi-liwet.jpg">Nasi Liwet (img/nasi-liwet.jpg)</option>
-                      <option value="img/soto-makassar.jpg">Soto Makassar (img/soto-makassar.jpg)</option>
-                      <option value="img/papeda.jpg">Papeda (img/papeda.jpg)</option>
-                      <option value="">Tanpa foto (ikon mangkuk)</option>
-                    </select>
+                    <label>Metode Foto</label>
+                    <div style="display:flex;gap:.4rem">
+                      <button type="button" class="btn sm" id="btnModeUpload" style="flex:1">Unggah Sendiri</button>
+                      <button type="button" class="btn sm ghost" id="btnModePreset" style="flex:1">Pilih Galeri</button>
+                    </div>
                   </div>
+                </div>
+
+                <div class="fld" id="fldPhotoUpload" style="margin-top:.3rem">
+                  <label for="rf_file">Unggah Foto Resep (dari Komputer/HP)</label>
+                  <input type="file" id="rf_file" accept="image/*" style="display:none">
+                  <div id="dropzonePhoto" style="border:2px dashed var(--line);border-radius:12px;padding:1.1rem;text-align:center;cursor:pointer;background:#faf8f5;transition:all .2s ease">
+                    <div style="margin-bottom:.3rem">${ic('chef')}</div>
+                    <div style="font-weight:700;font-size:.95rem" id="dropzoneTitle">Klik atau Tarik Foto ke Sini</div>
+                    <div class="muted sm" style="margin-top:.2rem">Format: JPG, PNG, atau WebP (Maksimal 5 MB)</div>
+                    <div id="selectedFileName" class="sm" style="display:none;margin-top:.5rem;font-weight:700;color:var(--ink);background:#fff;padding:.3rem .6rem;border-radius:6px;border:1px solid var(--line)"></div>
+                  </div>
+                </div>
+
+                <div class="fld" id="fldPhotoPreset" hidden style="margin-top:.3rem">
+                  <label for="rf_f">Pilih Foto dari Galeri Web</label>
+                  <select id="rf_f">
+                    <option value="img/rendang.jpg">Rendang (img/rendang.jpg)</option>
+                    <option value="img/gulai-itiak.jpg">Gulai Itiak (img/gulai-itiak.jpg)</option>
+                    <option value="img/sate-padang.jpg">Sate Padang (img/sate-padang.jpg)</option>
+                    <option value="img/pempek.jpg">Pempek (img/pempek.jpg)</option>
+                    <option value="img/soto-lamongan.jpg">Soto Lamongan (img/soto-lamongan.jpg)</option>
+                    <option value="img/rawon.jpg">Rawon (img/rawon.jpg)</option>
+                    <option value="img/gudeg.jpg">Gudeg (img/gudeg.jpg)</option>
+                    <option value="img/sate-lilit.jpg">Sate Lilit (img/sate-lilit.jpg)</option>
+                    <option value="img/ayam-betutu.jpg">Ayam Betutu (img/ayam-betutu.jpg)</option>
+                    <option value="img/gado-gado.jpg">Gado-Gado (img/gado-gado.jpg)</option>
+                    <option value="img/es-cendol.jpg">Es Cendol (img/es-cendol.jpg)</option>
+                    <option value="img/nasi-liwet.jpg">Nasi Liwet (img/nasi-liwet.jpg)</option>
+                    <option value="img/soto-makassar.jpg">Soto Makassar (img/soto-makassar.jpg)</option>
+                    <option value="img/papeda.jpg">Papeda (img/papeda.jpg)</option>
+                    <option value="">Tanpa foto (ikon mangkuk)</option>
+                  </select>
+                </div>
+
+                <div class="fld" id="photoPreviewWrap" style="margin-top:.4rem;padding:.7rem .9rem;background:#f5f2eb;border-radius:10px;display:flex;align-items:center;gap:.9rem;border:1px solid var(--line)">
+                  <div id="photoPreviewThumb" style="width:58px;height:58px;border-radius:8px;overflow:hidden;background:#fff;border:1px solid var(--line);flex-shrink:0;display:grid;place-items:center">
+                    <img id="rf_img_preview" src="" alt="Pratinjau" style="width:100%;height:100%;object-fit:cover;display:none">
+                    <span id="rf_icon_preview" style="color:var(--muted)">${ic('bowl')}</span>
+                  </div>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-weight:700;font-size:.9rem" id="photoPreviewTitle">Pratinjau Foto Resep</div>
+                    <div class="muted sm" id="photoPreviewSub" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Foto ini akan tampil pada katalog dan detail resep.</div>
+                  </div>
+                  <button type="button" class="btn ghost sm" id="btnHapusFoto" style="padding:.3rem .6rem;font-size:.8rem">Hapus Foto</button>
                 </div>
 
                 <div class="fld">
@@ -1715,11 +1749,189 @@
         renderTableRows();
       };
 
+      let selectedFile = null;
+      let activePhotoPath = '';
+      let photoMode = 'upload';
+
+      const updatePhotoUI = () => {
+        const previewImg = $('#rf_img_preview');
+        const previewIcon = $('#rf_icon_preview');
+        const previewSub = $('#photoPreviewSub');
+        const fileNameEl = $('#selectedFileName');
+        const dropzoneTitle = $('#dropzoneTitle');
+
+        if (selectedFile) {
+          if (previewImg) {
+            previewImg.style.display = 'block';
+            previewImg.src = activePhotoPath;
+          }
+          if (previewIcon) previewIcon.style.display = 'none';
+          if (previewSub) previewSub.textContent = `${selectedFile.name} (${(selectedFile.size / 1024).toFixed(0)} KB)`;
+          if (fileNameEl) {
+            fileNameEl.textContent = `File terpilih: ${selectedFile.name} (${(selectedFile.size / 1024).toFixed(0)} KB)`;
+            fileNameEl.style.display = 'inline-block';
+          }
+          if (dropzoneTitle) dropzoneTitle.textContent = 'Klik untuk Mengganti Foto';
+        } else if (activePhotoPath) {
+          if (previewImg) {
+            previewImg.style.display = 'block';
+            const displayUrl = /^(https?:\/\/|data:image\/)/i.test(activePhotoPath) ? activePhotoPath : (R + esc(activePhotoPath));
+            previewImg.src = displayUrl;
+          }
+          if (previewIcon) previewIcon.style.display = 'none';
+          if (previewSub) previewSub.textContent = activePhotoPath;
+          if (fileNameEl) fileNameEl.style.display = 'none';
+          if (dropzoneTitle) dropzoneTitle.textContent = 'Klik untuk Mengunggah Foto Baru';
+        } else {
+          if (previewImg) {
+            previewImg.style.display = 'none';
+            previewImg.src = '';
+          }
+          if (previewIcon) previewIcon.style.display = 'block';
+          if (previewSub) previewSub.textContent = 'Tidak ada foto (menggunakan ikon mangkuk default).';
+          if (fileNameEl) fileNameEl.style.display = 'none';
+          if (dropzoneTitle) dropzoneTitle.textContent = 'Klik atau Tarik Foto ke Sini';
+        }
+      };
+
+      const setPhotoMode = (mode) => {
+        photoMode = mode;
+        const uploadBox = $('#fldPhotoUpload');
+        const presetBox = $('#fldPhotoPreset');
+        const btnUpload = $('#btnModeUpload');
+        const btnPreset = $('#btnModePreset');
+
+        if (mode === 'upload') {
+          if (uploadBox) uploadBox.hidden = false;
+          if (presetBox) presetBox.hidden = true;
+          if (btnUpload) btnUpload.className = 'btn sm';
+          if (btnPreset) btnPreset.className = 'btn sm ghost';
+        } else {
+          if (uploadBox) uploadBox.hidden = true;
+          if (presetBox) presetBox.hidden = false;
+          if (btnUpload) btnUpload.className = 'btn sm ghost';
+          if (btnPreset) btnPreset.className = 'btn sm';
+          selectedFile = null;
+          activePhotoPath = $('#rf_f') ? $('#rf_f').value : '';
+          updatePhotoUI();
+        }
+      };
+
+      const optimizePhotoFile = (file) => {
+        return new Promise((resolve) => {
+          if (!file || !file.type.startsWith('image/') || file.type === 'image/gif') {
+            resolve(file);
+            return;
+          }
+          if (file.size <= 2 * 1024 * 1024 && typeof Image !== 'undefined') {
+            resolve(file);
+            return;
+          }
+          if (typeof FileReader === 'undefined' || typeof Image === 'undefined') {
+            resolve(file);
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+              const maxDim = 1920;
+              let width = img.width;
+              let height = img.height;
+              if (width > maxDim || height > maxDim) {
+                if (width > height) {
+                  height = Math.round((height * maxDim) / width);
+                  width = maxDim;
+                } else {
+                  width = Math.round((width * maxDim) / height);
+                  height = maxDim;
+                }
+              }
+              const canvas = document.createElement('canvas');
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              if (!ctx) { resolve(file); return; }
+              ctx.drawImage(img, 0, 0, width, height);
+              const outputType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+              if (typeof canvas.toBlob !== 'function') { resolve(file); return; }
+              canvas.toBlob((blob) => {
+                if (blob && (blob.size < file.size || file.size > 5 * 1024 * 1024)) {
+                  const newName = file.name.replace(/\.[^.]+$/, outputType === 'image/png' ? '.png' : '.jpg');
+                  const optimizedFile = new File([blob], newName, { type: outputType });
+                  resolve(optimizedFile);
+                } else {
+                  resolve(file);
+                }
+              }, outputType, 0.88);
+            };
+            img.onerror = () => resolve(file);
+            img.src = e.target.result;
+          };
+          reader.onerror = () => resolve(file);
+          reader.readAsDataURL(file);
+        });
+      };
+
+      const processFile = async (rawFile) => {
+        if (!rawFile) return;
+        if (!rawFile.type.startsWith('image/')) {
+          toast('Harap pilih file gambar (JPG, PNG, atau WebP).');
+          return;
+        }
+        let file = rawFile;
+        try {
+          file = await optimizePhotoFile(rawFile);
+        } catch (e) {
+          file = rawFile;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          toast('Ukuran foto terlalu besar. Maksimal 5 MB.');
+          return;
+        }
+        selectedFile = file;
+        const reader = new FileReader();
+        reader.onload = ev => {
+          activePhotoPath = ev.target.result;
+          updatePhotoUI();
+        };
+        reader.readAsDataURL(file);
+      };
+
+      const setupDropzone = () => {
+        const dz = $('#dropzonePhoto');
+        if (!dz || dz._bound) return;
+        dz._bound = true;
+        ['dragenter', 'dragover'].forEach(name => {
+          dz.addEventListener(name, e => {
+            e.preventDefault();
+            e.stopPropagation();
+            dz.style.borderColor = 'var(--gold)';
+            dz.style.background = '#f2ece1';
+          });
+        });
+        ['dragleave', 'drop'].forEach(name => {
+          dz.addEventListener(name, e => {
+            e.preventDefault();
+            e.stopPropagation();
+            dz.style.borderColor = 'var(--line)';
+            dz.style.background = '#faf8f5';
+          });
+        });
+        dz.addEventListener('drop', e => {
+          const files = e.dataTransfer && e.dataTransfer.files;
+          if (files && files[0]) {
+            processFile(files[0]);
+          }
+        });
+      };
+
       const openModal = async (recipe) => {
         const modal = $('#recipeModal');
         if (!modal) return;
         const title = $('#modalTitle');
         const form = $('#recipeForm');
+        setupDropzone();
 
         if (recipe) {
           title.textContent = 'Edit Resep: ' + (recipe.title || recipe.n);
@@ -1730,8 +1942,31 @@
           $('#rf_w').value = recipe.cook_time_minutes || recipe.w || 45;
           $('#rf_l').value = (recipe.difficulty || recipe.l || 'sedang').toLowerCase();
           $('#rf_s').value = recipe.servings || recipe.s || 4;
-          $('#rf_f').value = recipe.image_path || recipe.f || '';
           $('#rf_c').value = recipe.story || recipe.c || '';
+
+          selectedFile = null;
+          activePhotoPath = recipe.image_path || recipe.f || '';
+          const fileInput = $('#rf_file');
+          if (fileInput) fileInput.value = '';
+
+          const selectPreset = $('#rf_f');
+          let isPreset = false;
+          if (selectPreset) {
+            const hasOption = Array.from(selectPreset.options).some(opt => opt.value === activePhotoPath && opt.value !== '');
+            if (hasOption && activePhotoPath) {
+              selectPreset.value = activePhotoPath;
+              isPreset = true;
+            } else {
+              selectPreset.value = '';
+            }
+          }
+
+          if (isPreset) {
+            setPhotoMode('preset');
+          } else {
+            setPhotoMode('upload');
+          }
+          updatePhotoUI();
 
           let ingredients = recipe.ingredients || recipe.b || [];
           let steps = recipe.steps || recipe.t || [];
@@ -1754,7 +1989,16 @@
           $('#rf_s').value = 4;
           $('#rf_l').value = 'sedang';
           $('#rf_k').value = 'Makanan Berat';
-          $('#rf_f').value = 'img/rendang.jpg';
+
+          selectedFile = null;
+          activePhotoPath = '';
+          const fileInput = $('#rf_file');
+          if (fileInput) fileInput.value = '';
+          const selectPreset = $('#rf_f');
+          if (selectPreset) selectPreset.value = '';
+
+          setPhotoMode('upload');
+          updatePhotoUI();
         }
         modal.hidden = false;
       };
@@ -1771,6 +2015,29 @@
         }
         if (e.target.closest('#modalClose') || e.target.closest('#modalCancel')) {
           closeModal();
+          return;
+        }
+        if (e.target.closest('#btnModeUpload')) {
+          setPhotoMode('upload');
+          return;
+        }
+        if (e.target.closest('#btnModePreset')) {
+          setPhotoMode('preset');
+          return;
+        }
+        if (e.target.closest('#dropzonePhoto')) {
+          const fileInput = $('#rf_file');
+          if (fileInput) fileInput.click();
+          return;
+        }
+        if (e.target.closest('#btnHapusFoto')) {
+          selectedFile = null;
+          activePhotoPath = '';
+          const fileInput = $('#rf_file');
+          if (fileInput) fileInput.value = '';
+          const selectPreset = $('#rf_f');
+          if (selectPreset) selectPreset.value = '';
+          updatePhotoUI();
           return;
         }
         const editBtn = e.target.closest('[data-edit]');
@@ -1815,6 +2082,20 @@
         }
       });
 
+      rootEl.addEventListener('change', e => {
+        if (e.target.id === 'rf_file') {
+          const file = e.target.files && e.target.files[0];
+          if (file) processFile(file);
+          return;
+        }
+        if (e.target.id === 'rf_f') {
+          selectedFile = null;
+          activePhotoPath = e.target.value;
+          updatePhotoUI();
+          return;
+        }
+      });
+
       rootEl.addEventListener('submit', async e => {
         if (e.target.id !== 'recipeForm') return;
         e.preventDefault();
@@ -1826,13 +2107,38 @@
         const cook_time_minutes = +$('#rf_w').value || 30;
         const difficulty = $('#rf_l').value;
         const servings = +$('#rf_s').value || 4;
-        const image_path = $('#rf_f').value.trim();
         const story = $('#rf_c').value.trim();
         const bRaw = $('#rf_b').value.trim();
         const tRaw = $('#rf_t').value.trim();
 
         if (!title) { toast('Nama resep wajib diisi.'); return; }
         if (!story) { toast('Deskripsi resep wajib diisi.'); return; }
+
+        let image_path = activePhotoPath;
+
+        if (selectedFile) {
+          try {
+            toast('Mengunggah foto...');
+            const fd = new FormData();
+            fd.append('image', selectedFile);
+            const uploadRes = await api('admin/upload.php', {
+              method: 'POST',
+              body: fd
+            });
+            if (uploadRes && uploadRes.image_path) {
+              image_path = uploadRes.image_path;
+            }
+          } catch (uploadErr) {
+            if (activePhotoPath && activePhotoPath.startsWith('data:image/')) {
+              image_path = activePhotoPath;
+            } else {
+              toast('Gagal mengunggah foto: ' + (uploadErr.message || ''));
+              return;
+            }
+          }
+        } else if (photoMode === 'preset') {
+          image_path = $('#rf_f') ? $('#rf_f').value.trim() : '';
+        }
 
         const ingredients = bRaw.split('\n').map(line => line.trim()).filter(Boolean).map(line => {
           if (line.includes(',')) {

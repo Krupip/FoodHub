@@ -365,6 +365,26 @@ $imagePath = isset($input['image_path']) && is_string($input['image_path']) ? tr
 if ($imagePath === '') {
     $imagePath = null;
 }
+if ($imagePath !== null && str_starts_with($imagePath, 'data:image/')) {
+    if (preg_match('/^data:image\/(jpeg|png|webp);base64,(.+)$/', $imagePath, $matches)) {
+        $ext = '.' . ($matches[1] === 'jpeg' ? 'jpg' : $matches[1]);
+        $imageData = base64_decode($matches[2], true);
+        if ($imageData !== false && strlen($imageData) <= 5 * 1024 * 1024) {
+            $uploadDir = realpath(__DIR__ . '/../../../frontend/img');
+            if ($uploadDir === false) {
+                $uploadDir = __DIR__ . '/../../../frontend/img';
+            }
+            $targetSubDir = $uploadDir . DIRECTORY_SEPARATOR . 'uploads';
+            if (!is_dir($targetSubDir)) {
+                mkdir($targetSubDir, 0755, true);
+            }
+            $safeName = 'resep_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . $ext;
+            if (file_put_contents($targetSubDir . DIRECTORY_SEPARATOR . $safeName, $imageData) !== false) {
+                $imagePath = 'img/uploads/' . $safeName;
+            }
+        }
+    }
+}
 if ($imagePath !== null && mb_strlen($imagePath, 'UTF-8') > 255) {
     sendErrorResponse('Path gambar maksimal 255 karakter.', 422);
 }
