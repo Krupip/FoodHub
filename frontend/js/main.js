@@ -1,100 +1,97 @@
-/* FoodHub - main.js */
-(function () {
-  'use strict';
-  // === 1. INISIALISASI & UTILITAS DASAR ===
-  const P = document.body.dataset.page, R = document.body.dataset.root || '', ACC = document.body.dataset.access || '';
-  const qs = new URLSearchParams(location.search); const $ = (s, r) => (r || document).querySelector(s), $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
-  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const bar = (el, msg, ok) => { el.className = ok ? 'ok' : 'err'; el.textContent = msg; el.hidden = false; };
-  function toast(msg) { let t = $('#toast') || Object.assign(document.createElement('div'), { id: 'toast' }); if (!t.parentElement) document.body.appendChild(t);
-    t.textContent = msg; t.className = 'show'; clearTimeout(t._h); t._h = setTimeout(() => { t.className = ''; }, 2600); }
-  // === 2. HTTP CLIENT, AUTENTIKASI & KEAMANAN CSRF ===
-  const BASE = (R ? R + '../' : '../') + 'backend/api/', CSRF_ERR = 'Token CSRF server hilang atau tidak valid. Muat ulang halaman.';
-  const AUTH_ERR = 'Respons autentikasi server tidak valid. Silakan coba lagi.', UNAV_ERR = 'Tidak dapat memeriksa sesi. Pastikan backend tersedia.';
-  let csrfToken = null, U = null, loggingOut = false; const isSafe = m => ['GET', 'HEAD', 'OPTIONS'].includes(m);
-  const authAct = p => p.split('?')[0] === 'auth.php' ? new URLSearchParams(p.split('?')[1] || '').get('action') : null;
-  const authResp = d => { if (!d || typeof d !== 'object' || Array.isArray(d) || 'error' in d) throw new Error(AUTH_ERR); return d; };
-  const authUser = (d, guest = false) => { const u = authResp(d).user; if (guest && u === null) return null;
-    const ok = u && ((Number.isSafeInteger(u.id) && u.id > 0) || (typeof u.id === 'string' && /^[1-9]\d*$/.test(u.id)));
-    if (!ok || !u.name?.trim() || !u.email?.trim() || !['member', 'admin'].includes(u.role)) throw new Error(AUTH_ERR); return u; };
-  async function fetchApi(path, opts = {}) {
-    const method = (opts.method || 'GET').toUpperCase(), act = authAct(path), pub = method === 'POST' && ['login', 'register'].includes(act);
-    const hdrs = { 'Content-Type': 'application/json', ...opts.headers }; for (const k in hdrs) { if (k.toLowerCase() === 'x-csrf-token') delete hdrs[k]; }
-    if (!isSafe(method) && csrfToken) hdrs['X-CSRF-Token'] = csrfToken;
-    let body = opts.body; if (body instanceof FormData) delete hdrs['Content-Type']; else if (body && typeof body === 'object') body = JSON.stringify(body);
-    const res = await fetch(BASE + path, { ...opts, method, credentials: 'same-origin', headers: hdrs, body });
-    const hdr = res.headers && typeof res.headers.get === 'function' ? res.headers.get('X-CSRF-Token') : null;
-    const tok = typeof hdr === 'string' && /^[0-9a-f]{64}$/.test(hdr) ? hdr : null, data = await res.json().catch(() => ({}));
-    if (res.ok && ((method === 'GET' && act === 'me') || pub)) { csrfToken = null; U = null; const user = authUser(data, act === 'me'); if (user && !tok) throw new Error(CSRF_ERR);
-      U = user; csrfToken = user ? tok : null; } else if (res.ok && method === 'POST' && act === 'logout') {
-      if (typeof authResp(data).message !== 'string' || !data.message.trim()) throw new Error(AUTH_ERR); U = null; csrfToken = null;
-    } else if (res.status === 401 && !pub) { U = null; csrfToken = null; } else if (tok) { csrfToken = tok; }
-    if (!res.ok) { const err = new Error(data?.error || 'Terjadi kesalahan sistem.'); err.status = res.status; err.data = data; throw err; } return data;
-  }
-  async function api(path, opts = {}) { const m = (opts.method || 'GET').toUpperCase();
-    if (!isSafe(m) && !(['login', 'register'].includes(authAct(path)) && m === 'POST') && !csrfToken) await fetchApi('auth.php?action=me'); return fetchApi(path, opts); }
-  // === 3. PENYIMPANAN LOKAL & DATA DUMMY ===
-  const ld = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } }; const sv = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
-  const clearAuth = () => { try { sessionStorage.removeItem('fh_s'); } catch {} try { localStorage.removeItem('fh_s'); } catch {} };
-  const users = () => { let u = ld('fh_users', null); if (!u) { u = [{ name: 'Admin FoodHub', email: 'admin@foodhub.id', role: 'admin', fav: [], at: '2026-08-01' },
-    { name: 'Raka Pratama', email: 'raka@contoh.id', role: 'member', fav: [1, 2], at: '2026-09-12' }, { name: 'Nadia Putri', email: 'nadia@contoh.id', role: 'member', fav: [3], at: '2026-10-03' }]; sv('fh_users', u); }
-    if (Array.isArray(u) && u.some(x => 'pass' in x)) { u = u.map(({ pass, ...r }) => r); sv('fh_users', u); } return u; };
-  // === 4. MANAJEMEN SESI, AKSES HALAMAN & SUBMIT FORM ===
-  async function logout() { if (loggingOut) return; loggingOut = true; $$('#lo, #alo').forEach(b => { b.disabled = true; });
-    try { const r = authResp(await api('auth.php?action=logout', { method: 'POST' })); if (!r.message?.trim()) throw new Error(AUTH_ERR); U = null; clearAuth(); location.href = R + 'index.html'; }
-    catch (e) { toast('Gagal keluar: ' + (e.message || '')); } finally { loggingOut = false; $$('#lo, #alo').forEach(b => { b.disabled = false; }); } }
-  function bindSubmit(form, fn) { let busy = false; form.addEventListener('submit', async e => { e.preventDefault(); if (busy) return; busy = true; $$('[type="submit"]', form).forEach(b => { b.disabled = true; });
-    try { await fn(); } finally { busy = false; $$('[type="submit"]', form).forEach(b => { b.disabled = false; }); } }); }
-  async function initAuth() {
-    const els = ACC ? $$('main, #nav, #side, #top, #foot').map(el => ({ el, h: el.hidden })) : [];
-    els.forEach(({ el }) => { el.hidden = true; }); U = null; csrfToken = null; clearAuth(); let unav = false;
-    try { U = authUser(await api('auth.php?action=me'), true); } catch (e) { U = null; unav = true; toast(UNAV_ERR + (e.message === CSRF_ERR ? ' ' + CSRF_ERR : '')); }
-    const nt = unav ? '&auth=unavailable' : '';
-    if (ACC === 'member' && !U) { location.replace(R + 'masuk.html?next=' + encodeURIComponent(location.pathname.split('/').pop() + location.search) + nt); return false; }
-    if (ACC === 'admin') { if (!U) { location.replace(R + 'masuk.html?next=' + encodeURIComponent('admin/' + location.pathname.split('/').pop()) + nt); return false; }
-      if (U.role !== 'admin') { location.replace(R + 'index.html'); return false; } }
-    if ($('#nav')) buildNav(); if ($('#side')) buildAdmin(); els.forEach(({ el, h }) => { el.hidden = h; }); return true;
-  }
-  // === 5. RENDER NAVIGASI PUBLIK & SIDEBAR ADMIN ===
-  function buildNav() {
-    const menu = [['index', 'Beranda'], ['daftar-resep', 'Resep'], ['faq', 'FAQ']], cur = P === 'detail-resep' ? 'daftar-resep' : P;
-    const lnk = menu.map(([k, lb]) => `<a href="${R}${k}.html"${k === cur ? ' class="on"' : ''}>${lb}</a>`).join('');
-    const uBox = U ? `<div class="acc"><button class="av" id="avb">${esc(U.name[0].toUpperCase())}</button>` + `<div class="dd" id="dd" hidden><div class="dn">${esc(U.name)}<small>${esc(U.email)}</small></div>` + `<a href="${R}profil.html">Profil</a>${U.role === 'admin' ? `<a href="${R}admin/dasbor.html">Admin</a>` : ''}` + `<button id="lo">Keluar</button></div></div>` : `<a class="btn ghost sm" href="${R}masuk.html">Masuk</a><a class="btn sm" href="${R}daftar.html">Daftar</a>`;
-    $('#nav').innerHTML = `<div class="container nb"><a class="logo" href="${R}index.html">FoodHub</a><nav class="nl">${lnk}</nav><div class="na">${uBox}</div></div>`;
-    $('#avb')?.addEventListener('click', e => { e.stopPropagation(); $('#dd').hidden = !$('#dd').hidden; });
-    document.addEventListener('click', () => { if ($('#dd')) $('#dd').hidden = true; }); $('#lo')?.addEventListener('click', logout);
-  }
-  function buildAdmin() { $('#top').innerHTML = `<strong>FoodHub Admin</strong><span class="muted sm">${esc(U?.name || 'Admin')}</span>`;
-    $('#side').innerHTML = `<a href="dasbor.html" class="on">Dasbor</a><a href="kelola-resep.html">Kelola Resep</a>` + `<a href="kelola-pengguna.html">Kelola Pengguna</a><a href="${R}index.html">Situs</a><button id="alo">Keluar</button>`; $('#alo')?.addEventListener('click', logout); }
-  // === 6. KARTU RESEP & LOGIKA TIAP HALAMAN ===
-  const img = p => !p ? '' : (/^(https?:|data:)/.test(p) ? p : R + esc(p));
-  const card = r => `<a class="card" href="${R}detail-resep.html?id=${r.id}"><div class="thumb">${img(r.image_path) ? `<img src="${img(r.image_path)}">` : ''}</div>` + `<div><h3>${esc(r.title)}</h3><div class="meta"><span>${r.cook_time_minutes || 30} mnt</span><span>${esc(r.difficulty || 'Sedang')}</span></div></div></a>`;
-  const PG = {
-    // === 6.1. BERANDA ===
-    async index() { try { const { recipes } = await api('recipes.php?sort=popular&limit=4'); $('#pop').innerHTML = recipes.map(card).join(''); } catch {} },
-    // === 6.2. DAFTAR RESEP ===
-    async 'daftar-resep'() { const q = $('#fq'), run = async () => { try { const { recipes } = await api('recipes.php?q=' + encodeURIComponent(q?.value || '')); $('#rl').innerHTML = recipes.map(card).join(''); } catch {} }; q?.addEventListener('input', run); run(); },
-    // === 6.3. DETAIL RESEP & FAVORIT ===
-    async 'detail-resep'() { const id = qs.get('id'), box = $('#dr'); if (!id) return box.innerHTML = '<div class="empty"><h2>Resep tidak ditemukan</h2><a class="btn" href="daftar-resep.html">Lihat semua</a></div>';
-      let r = null; try { const res = await api('recipes.php?id=' + encodeURIComponent(id)); r = res?.recipe; if (!r || typeof r.title !== 'string' || !Array.isArray(r.ingredients) || !Array.isArray(r.steps)) throw new Error(); } catch (e) { const nf = e.status === 404 || e.status === 422; return box.innerHTML = `<div class="empty"><h2>${nf ? 'Resep tidak ditemukan' : 'Gagal memuat resep'}</h2><a class="btn" href="daftar-resep.html">Lihat semua</a></div>`; }
-      let isFav = !!r.is_favorite; const cats = (r.categories || []).map(k => `<span class="tag">${esc(k)}</span>`).join(' ');
-      const ings = r.ingredients.map(i => `<li>${esc(i.name)}</li>`).join(''), steps = r.steps.map(s => `<li>${esc(s)}</li>`).join('');
-      const info = `<span>Waktu: <b>${r.cook_time_minutes || 30} mnt</b></span><span>Porsi: <b id="sv">${r.servings || 4}</b></span><span>Rating: <b id="rt">★ ${r.avg_rating != null ? Number(r.avg_rating).toFixed(1) : '-'}</b></span>`;
-      box.innerHTML = `<div class="panel"><div>${cats}</div><h1>${esc(r.title)}</h1><p class="muted sm">Oleh ${esc(r.author || 'FoodHub')}</p>` + `<div class="detail-info">${info}</div>${r.story ? `<p>${esc(r.story)}</p>` : ''}` + `<button class="btn sm" id="fv" type="button">&hearts; <span id="fvt">${isFav ? 'Tersimpan di Favorit' : 'Simpan ke Favorit'}</span></button>` + `<h2>Bahan-bahan</h2><ul>${ings}</ul><h2>Langkah Memasak</h2><ol>${steps}</ol></div>`;
-      $('#fv')?.addEventListener('click', async () => { if (!U) return location.href = R + 'masuk.html'; try { if (isFav) { await api('favorites.php?recipe_id=' + encodeURIComponent(id), { method: 'DELETE' }); isFav = false; $('#fvt').textContent = 'Simpan ke Favorit'; } else { await api('favorites.php', { method: 'POST', body: { recipe_id: id } }); isFav = true; $('#fvt').textContent = 'Tersimpan di Favorit'; } } catch (e) { toast(e.message || 'Gagal.'); } }); },
-    // === 6.4. PROFIL PENGGUNA ===
-    async profil() { let pu = U, fav = []; try { pu = (await api('profile.php')).user || U; } catch {} try { fav = (await api('favorites.php')).recipes || []; } catch {}
-      $('#pf').innerHTML = `<h1>Profil Saya</h1><div class="panel"><p><strong>${esc(pu.name)}</strong><br>${esc(pu.email)}</p>` + `<form id="nf"><div class="ok" id="no" hidden></div><div class="err" id="ne" hidden></div><input id="nn" value="${esc(pu.name)}"><button class="btn sm" type="submit">Simpan</button></form></div>` + `<h2>Favorit (${fav.length})</h2><div class="grid">${fav.map(card).join('')}</div>`;
-      bindSubmit($('#nf'), async () => { const v = $('#nn').value.trim(); if (v.length < 3) return bar($('#ne'), 'Nama min 3 karakter.'); try { const res = await api('profile.php', { method: 'POST', body: { name: v } }); pu = res.user; U = res.user; bar($('#no'), 'Tersimpan!', true); } catch (err) { bar($('#ne'), err.message || 'Gagal simpan.'); } }); },
-    // === 6.5. MASUK (LOGIN) ===
-    masuk() { if (U) return location.replace(U.role === 'admin' ? 'admin/dasbor.html' : 'profil.html'); if (qs.get('auth') === 'unavailable') bar($('#er'), UNAV_ERR);
-      bindSubmit($('#lf'), async () => { const em = $('#em').value.trim().toLowerCase(), pw = $('#pw').value; if (!em || !pw) return bar($('#er'), 'Email dan kata sandi wajib diisi.'); try { const res = await api('auth.php?action=login', { method: 'POST', body: { email: em, password: pw, remember: $('#ing').checked } }); U = authUser(res); clearAuth(); const nx = qs.get('next'); location.href = nx && /^(admin\/)?[a-z-]+\.html/i.test(nx) ? nx : (U.role === 'admin' ? 'admin/dasbor.html' : 'index.html'); } catch (err) { bar($('#er'), err.message || 'Email atau kata sandi salah.'); } }); },
-    // === 6.6. DAFTAR (REGISTRASI) ===
-    daftar() { if (U) return location.replace('profil.html');
-      bindSubmit($('#df'), async () => { const nm = $('#dn').value.trim(), em = $('#de').value.trim().toLowerCase(), pw = $('#dp').value, Er = []; if (nm.length < 3) Er.push('Nama min 3 karakter.'); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) Er.push('Email tidak valid.'); if (pw.length < 8) Er.push('Kata sandi min 8 karakter.'); if (pw !== $('#dk').value) Er.push('Konfirmasi kata sandi tidak sama.'); if (!$('#ds').checked) Er.push('Centang persetujuan syarat.'); if (Er.length) { $('#er').innerHTML = `<ul>${Er.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`; $('#er').hidden = false; return; } try { const res = await api('auth.php?action=register', { method: 'POST', body: { name: nm, email: em, password: pw } }); U = authUser(res); clearAuth(); toast('Pendaftaran berhasil!'); location.href = 'index.html'; } catch (err) { $('#er').innerHTML = `<p>${esc(err.message || 'Pendaftaran gagal.')}</p>`; $('#er').hidden = false; } }); },
-    // === 6.7. HALAMAN STATIS & ADMIN ===
-    faq() {}, dasbor() {}, 'kelola-resep'() {}, 'moderasi-resep'() {}, 'kelola-pengguna'() {} };
-  // === 7. INISIALISASI APLIKASI & EKSPOS PENGUJIAN ===
-  async function init() { const ok = await initAuth(); if (ok && PG[P]) { const r = PG[P](); if (r?.catch) r.catch(console.error); } }
-  globalThis.authTest = { api, logout, init, initAuth, PG, users, get user() { return U; } }; init();
-})();
+// 1. KONFIGURASI, SHORTCUT DOM, & STATE
+const API = 'api', $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const on = (el, ev, fn) => el?.addEventListener(ev, fn), fObj = f => Object.fromEntries(new FormData(f));
+const val = (s, v) => $(s) && ($(s).value = v ?? ''), txt = (s, v) => $(s) && ($(s).textContent = v);
+const btn = (c, d, t) => `<button class="btn btn-sm ${c}" data-id="${d}">${t}</button>`;
+let csrf = $('meta[name="csrf-token"]')?.content || '', user = null, detail = null, porsi = 1, base = 1, star = 5;
+
+// 2. HELPER FETCH API (Jembatan Frontend <-> Backend PHP + CSRF)
+async function api(url, method = 'GET', body) {
+  const h = csrf ? { 'X-CSRF-Token': csrf } : {};
+  if (body && !(body instanceof FormData)) { h['Content-Type'] = 'application/json'; body = JSON.stringify(csrf ? { csrf_token: csrf, ...body } : body); }
+  else if (body instanceof FormData && csrf) body.append('csrf_token', csrf);
+  const res = await fetch(`${API}/${url}`, { method, headers: h, body, credentials: 'same-origin' });
+  const d = await res.json().catch(() => ({})); if (d.csrf_token) csrf = d.csrf_token;
+  if (!res.ok || d.success === false) throw new Error(d.message || 'Request gagal'); return d; }
+const put = (u, b, fn) => api(u, 'PUT', b).then(fn), del = (u, fn) => confirm('Hapus?') && api(u, 'DELETE').then(fn);
+
+// 3. HELPER LIST & CETAK KARTU RESEP
+const list = r => Array.isArray(r) ? r : (r?.data || r?.recipes || r?.categories || r?.reviews || r?.users || []);
+const cards = (el, items, fav) => el && (el.innerHTML = items.length ? items.map(r => `<div class="recipe-card">` +
+  `<a href="recipe-detail.html?id=${r.id}"><img src="${r.image || r.image_url || ''}"></a><div class="recipe-card-body">` +
+  `<small>${r.category_name || ''} • ${r.cooking_time || '-'} mnt</small><h4><a href="recipe-detail.html?id=${r.id}">${r.title}</a></h4>` +
+  `${fav ? btn('rm-fav', r.id, 'Hapus') : ''}</div></div>`).join('') : '<p>Tidak ada resep.</p>');
+
+// 4. INISIALISASI FITUR SAAT HALAMAN SELESAI DIMUAT
+document.addEventListener('DOMContentLoaded', async () => {
+  // A. AUTH: Cek sesi user, form login/register, & logout (auth.php)
+  try { const r = await api('auth.php?action=me'); user = r.user || r.data || null; } catch {}
+  ['login', 'register'].forEach(a => on($(`#${a}-form`), 'submit', async e => {
+    e.preventDefault(); await api(`auth.php?action=${a}`, 'POST', fObj(e.target)); location.href = a === 'login' ? 'index.html' : 'login.html'; }));
+  on($('#btn-logout'), 'click', async e => { e.preventDefault(); await api('auth.php?action=logout', 'POST').catch(() => {}); location.href = 'login.html'; });
+
+  // B. BERANDA & DAFTAR RESEP: Cari, chip kategori, & filter (categories.php, recipes.php)
+  const cats = list(await api('categories.php').catch(() => [])), feat = $('#featured-recipes'), chips = $('#category-chips'), grid = $('#recipes-grid');
+  on($('#btn-home-search'), 'click', () => location.href = `recipes.html?q=${encodeURIComponent($('#home-search-input')?.value || '')}`);
+  if (chips && cats.length) { // Tombol chip kategori beranda
+    chips.innerHTML = `<button class="chip active" data-c="">Semua</button>` + cats.map(c => `<button class="chip" data-c="${c.id}">${c.name}</button>`).join('');
+    on(chips, 'click', async e => { const b = e.target.closest('.chip'); if (!b) return; $$('.chip', chips).forEach(x => x.classList.remove('active'));
+      b.classList.add('active'); cards(feat, list(await api(b.dataset.c ? `recipes.php?category=${b.dataset.c}` : 'recipes.php?sort=popular&limit=4'))); }); }
+  if (feat) cards(feat, list(await api('recipes.php?sort=popular&limit=4')));
+  if (grid) { // Filter pencarian, kategori, waktu, kesulitan, & reset
+    const p = new URLSearchParams(location.search), q = $('#search-input'), cat = $('#filter-category'), tm = $('#filter-time'), df = $('#filter-difficulty');
+    if (cat) cat.innerHTML = `<option value="">Semua Kategori</option>` + cats.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    val('#search-input', p.get('q')); val('#filter-category', p.get('category'));
+    const load = async () => { const qs = new URLSearchParams(); [['q', q], ['category', cat], ['max_time', tm], ['difficulty', df]]
+      .forEach(([k, el]) => el?.value && qs.set(k, el.value)); cards(grid, list(await api(`recipes.php?${qs}`))); };
+    [q, cat, tm, df].forEach(el => on(el, el === q ? 'input' : 'change', load));
+    on($('#btn-reset-filter'), 'click', () => { [q, cat, tm, df].forEach(el => el && (el.value = '')); load(); }); load(); }
+
+  // C. DETAIL RESEP: Porsi (+/-), favorit, & ulasan (recipes.php, favorites.php, reviews.php)
+  const box = $('#recipe-detail'), id = new URLSearchParams(location.search).get('id');
+  if (box && id) {
+    const res = await api(`recipes.php?id=${id}`); detail = res.recipe || res.data || res; base = porsi = Math.max(1, parseInt(detail.servings) || 1);
+    const renderIng = () => { txt('#porsi-val', `${porsi} Porsi`); // Hitung ulang takaran bahan
+      $('#ingredients-list').innerHTML = (detail.ingredients || []).map(i => `<li class="ingredient-item">` +
+        `<span class="ing-measure">${i.quantity > 0 ? +(i.quantity * porsi / base).toFixed(2) + ' ' + (i.unit || '') : 'Secukupnya'}</span><span>${i.name}</span></li>`).join(''); };
+    $('#ingredients-list')?.insertAdjacentHTML('beforebegin', `<div class="servings-control"><button id="p-min" class="servings-btn">−</button><strong id="porsi-val"></strong><button id="p-plus" class="servings-btn">+</button></div>`);
+    renderIng(); on($('#p-min'), 'click', () => porsi > 1 && (porsi--, renderIng())); on($('#p-plus'), 'click', () => (porsi++, renderIng()));
+    on($('#btn-favorite'), 'click', async e => { const f = await api('favorites.php', 'POST', { recipe_id: id }); e.target.textContent = f.is_favorite ? '♥ Tersimpan' : '♡ Favorit'; });
+    box.insertAdjacentHTML('beforeend', `<section class="reviews-section"><h3>Ulasan (<span id="avg-r">0</span> ★)</h3><form id="rev-form"><div class="star-picker">` +
+      `${[1,2,3,4,5].map(n => `<button type="button" data-s="${n}" class="active">★</button>`).join('')}</div><textarea id="rev-txt" required></textarea><button class="btn btn-primary btn-sm">Kirim</button></form><div id="rev-list"></div></section>`);
+    on($('.star-picker'), 'click', e => e.target.dataset.s && (star = +e.target.dataset.s, $$('.star-picker button').forEach(b => b.classList.toggle('active', +b.dataset.s <= star))));
+    const loadRev = async () => { const revs = list(await api(`reviews.php?recipe_id=${id}`)); // Muat ulasan & rating
+      txt('#avg-r', revs.length ? (revs.reduce((a, b) => a + +b.rating, 0) / revs.length).toFixed(1) : '0');
+      $('#rev-list').innerHTML = revs.map(v => `<div class="review-item"><b>${v.user_name || 'User'}</b> (${'★'.repeat(v.rating)}) ` +
+        `${user && (user.role === 'admin' || user.id == v.user_id) ? btn('btn-danger del-r', v.id, 'Hapus') : ''}<p>${v.comment}</p></div>`).join(''); };
+    on($('#rev-form'), 'submit', async e => { e.preventDefault(); await api('reviews.php', 'POST', { recipe_id: id, rating: star, comment: $('#rev-txt').value }); val('#rev-txt', ''); loadRev(); });
+    on($('#rev-list'), 'click', e => e.target.classList.contains('del-r') && del(`reviews.php?id=${e.target.dataset.id}`, loadRev)); loadRev(); }
+
+  // D. PROFIL & ADMIN: Profil, favorit, statistik, kelola resep/foto, & kelola user
+  if ($('#profile-form')) { val('#profile-form [name="name"]', (await api('profile.php')).user?.name); // Ubah profil
+    on($('#profile-form'), 'submit', async e => { e.preventDefault(); await api('profile.php', 'POST', fObj(e.target)); alert('Tersimpan'); }); }
+  if ($('#favorite-recipes')) { const loadFav = async () => cards($('#favorite-recipes'), list(await api('favorites.php')), true); // Favorit
+    on($('#favorite-recipes'), 'click', e => e.target.classList.contains('rm-fav') && api('favorites.php', 'POST', { recipe_id: e.target.dataset.id, action: 'remove' }).then(loadFav)); loadFav(); }
+  if ($('[data-stat], #stat-recipes')) { const st = (await api('admin/stats.php')).stats || await api('admin/stats.php'); // Statistik
+    ['recipes', 'users', 'categories', 'reviews'].forEach(k => { const v = st[`total_${k}`] ?? st[k] ?? 0; txt(`#stat-${k}`, v); $$(`[data-stat="${k}"]`).forEach(el => el.textContent = v); }); }
+  const rBody = $('#admin-recipes-tbody'), uBody = $('#admin-users-tbody');
+  if (rBody) { // Admin: Kelola Resep CRUD & Upload Foto (admin/recipes.php, admin/upload.php)
+    document.body.insertAdjacentHTML('beforeend', `<div id="r-modal" class="modal-backdrop"><div class="modal-dialog"><form id="r-form">` +
+      `<input type="hidden" name="id"><input type="hidden" name="image" id="r-img"><input name="title" placeholder="Judul" required><input name="category_id" placeholder="ID Kategori" required>` +
+      `<input type="number" name="cooking_time" value="30"><input type="number" name="servings" value="2"><select name="difficulty"><option>Mudah</option><option>Sedang</option></select>` +
+      `<input type="file" id="r-file"><textarea name="ingredients_json" placeholder='[{"quantity":2,"unit":"sdm","name":"Gula"}]'></textarea>` +
+      `<button class="btn btn-primary">Simpan</button> <button type="button" class="btn" onclick="$('#r-modal').classList.remove('open')">Tutup</button></form></div></div>`);
+    const loadR = async () => rBody.innerHTML = list(await api('admin/recipes.php')).map(r => `<tr><td><img class="table-thumb" src="${r.image || ''}"></td><td>${r.title}</td><td>${r.category_name || '-'}</td>` +
+      `<td><span class="badge ${r.is_published == 1 ? 'badge-success' : 'badge-warning'}">${r.is_published == 1 ? 'Tayang' : 'Draft'}</span></td>` +
+      `<td><button class="btn btn-sm r-pub" data-id="${r.id}" data-p="${r.is_published}">${r.is_published == 1 ? 'Tarik' : 'Tayang'}</button> ${btn('r-edit', r.id, 'Edit')} ${btn('btn-danger r-del', r.id, 'Hapus')}</td></tr>`).join('');
+    on($('#btn-add-recipe'), 'click', () => { $('#r-form').reset(); val('#r-form [name="id"]', ''); $('#r-modal').classList.add('open'); });
+    on($('#r-file'), 'change', async e => { const fd = new FormData(); fd.append('image', e.target.files[0]); val('#r-img', (await api('admin/upload.php', 'POST', fd)).url); alert('Foto terunggah'); });
+    on($('#r-form'), 'submit', async e => { e.preventDefault(); const d = fObj(e.target); try { d.ingredients = JSON.parse(d.ingredients_json || '[]'); } catch { d.ingredients = []; } await api('admin/recipes.php', d.id ? 'PUT' : 'POST', d); $('#r-modal').classList.remove('open'); loadR(); });
+    on(rBody, 'click', async e => { const id = e.target.dataset.id; if (!id) return; if (e.target.classList.contains('r-del')) del(`admin/recipes.php?id=${id}`, loadR);
+      if (e.target.classList.contains('r-pub')) put('admin/recipes.php', { id, is_published: e.target.dataset.p == 1 ? 0 : 1 }, loadR);
+      if (e.target.classList.contains('r-edit')) { const d = (await api(`recipes.php?id=${id}`)).recipe || {}; ['id', 'title', 'category_id', 'cooking_time', 'servings', 'difficulty', 'image'].forEach(k => val(`#r-form [name="${k}"]`, d[k])); val('#r-form [name="ingredients_json"]', JSON.stringify(d.ingredients || [])); $('#r-modal').classList.add('open'); } }); loadR(); }
+  if (uBody) { // Admin: Kelola Pengguna (admin/users.php)
+    const loadU = async () => uBody.innerHTML = list(await api('admin/users.php')).map((u, i) => `<tr><td>${i + 1}</td><td>${u.name}</td><td>${u.email}</td><td><select class="u-role" data-id="${u.id}"><option value="user">User</option><option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option></select></td><td><button class="btn btn-sm u-stat" data-id="${u.id}" data-a="${u.is_active ?? 1}">${(u.is_active ?? 1) == 1 ? 'Nonaktifkan' : 'Aktifkan'}</button> ${btn('btn-danger u-del', u.id, 'Hapus')}</td></tr>`).join('');
+    on(uBody, 'change', e => e.target.classList.contains('u-role') && put('admin/users.php', { id: e.target.dataset.id, role: e.target.value }));
+    on(uBody, 'click', e => { const id = e.target.dataset.id; if (!id) return; if (e.target.classList.contains('u-stat')) put('admin/users.php', { id, is_active: e.target.dataset.a == 1 ? 0 : 1 }, loadU); if (e.target.classList.contains('u-del')) del(`admin/users.php?id=${id}`, loadU); }); loadU(); }
+});
