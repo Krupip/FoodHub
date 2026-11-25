@@ -5,21 +5,64 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Kelola Resep | FoodHub</title>
   <link rel="icon" href="../img/logo-foodhub.jpg">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;0,800;1,600&family=Outfit:wght@400;500;600&display=swap">
   <link rel="stylesheet" href="../css/style.css">
 </head>
 <body data-page="kelola-resep" data-root="../" data-access="admin">
-  <div class="adm">
-    <aside id="side"></aside>
-    <div>
-      <header id="top"></header>
-      <main class="adm-c">
-        <div id="kr"></div>
-      </main>
+  <header id="top"></header>
+  <nav id="side"></nav>
+
+  <main class="adm-c">
+    <div class="sec-h">
+      <div><h1>Kelola Resep</h1><p class="muted sm">Tambah, edit, hapus, atau atur status resep.</p></div>
+      <button class="btn sm" id="btnTambahResep" type="button">+ Tambah Resep</button>
     </div>
-  </div>
+
+    <div class="panel" id="recipePanel" hidden>
+      <h2 id="modalTitle">Tambah Resep Baru</h2>
+      <form id="recipeForm" novalidate>
+        <input type="hidden" id="rf_id">
+        <div class="fld"><label for="rf_n">Nama Resep *</label><input id="rf_n" required></div>
+        <div class="fld"><label for="rf_p">Asal Daerah</label><input id="rf_p"></div>
+        <div class="fld">
+          <label for="rf_k">Kategori</label>
+          <select id="rf_k">
+            <option value="Makanan Berat">Makanan Berat</option>
+            <option value="Sehat">Sehat</option>
+            <option value="Minuman">Minuman</option>
+            <option value="Cepat">Cepat</option>
+            <option value="Anak Kos">Anak Kos</option>
+          </select>
+        </div>
+        <div class="fld"><label for="rf_w">Waktu Memasak (menit)</label><input type="number" id="rf_w" min="1" value="45"></div>
+        <div class="fld">
+          <label for="rf_l">Tingkat Kesulitan</label>
+          <select id="rf_l">
+            <option value="mudah">Mudah</option>
+            <option value="sedang" selected>Sedang</option>
+            <option value="sulit">Sulit</option>
+          </select>
+        </div>
+        <div class="fld"><label for="rf_s">Porsi (orang)</label><input type="number" id="rf_s" min="1" value="4"></div>
+        <div class="fld"><label for="rf_file">Foto Resep (Maks. 5 MB)</label><input type="file" id="rf_file" accept="image/*"></div>
+        <div class="fld"><label for="rf_c">Deskripsi Singkat *</label><textarea id="rf_c" rows="2" required></textarea></div>
+        <div class="fld"><label for="rf_b">Bahan (Nama, Jumlah, Satuan per baris)</label><textarea id="rf_b" rows="3"></textarea></div>
+        <div class="fld"><label for="rf_t">Langkah Memasak (1 langkah per baris)</label><textarea id="rf_t" rows="3"></textarea></div>
+        <div style="display:flex;gap:.5rem;justify-content:flex-end">
+          <button class="btn ghost sm" type="button" id="formCancel">Batal</button>
+          <button class="btn sm" type="submit">Simpan Resep</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="tw">
+      <table>
+        <thead>
+          <tr><th>Foto</th><th>Nama Resep</th><th>Kategori</th><th>Waktu</th><th>Status</th><th>Aksi</th></tr>
+        </thead>
+        <tbody id="resepTableBody"></tbody>
+      </table>
+    </div>
+  </main>
 
   <script src="../js/main.js"></script>
 </body>

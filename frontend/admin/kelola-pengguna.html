@@ -5,21 +5,62 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Kelola Pengguna | FoodHub</title>
   <link rel="icon" href="../img/logo-foodhub.jpg">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;0,800;1,600&family=Outfit:wght@400;500;600&display=swap">
   <link rel="stylesheet" href="../css/style.css">
 </head>
 <body data-page="kelola-pengguna" data-root="../" data-access="admin">
-  <div class="adm">
-    <aside id="side"></aside>
-    <div>
-      <header id="top"></header>
-      <main class="adm-c">
-        <div id="us"></div>
-      </main>
+  <header id="top"></header>
+  <nav id="side"></nav>
+
+  <main class="adm-c">
+    <div class="sec-h">
+      <div>
+        <h1>Kelola Pengguna</h1>
+        <p class="muted sm">Lihat, tambah, dan hapus akun pengguna di FoodHub.</p>
+      </div>
+      <button class="btn sm" id="btnTambahPengguna" type="button">+ Tambah Pengguna</button>
     </div>
-  </div>
+
+    <div class="panel" id="userPanel" hidden>
+      <h2 style="margin-bottom:1rem">Tambah Pengguna Baru</h2>
+      <form id="userForm" novalidate>
+        <div class="fld-row">
+          <div class="fld">
+            <label for="uf_name">Nama Lengkap *</label>
+            <input type="text" id="uf_name" required placeholder="Contoh: Budi Santoso" minlength="3" maxlength="100">
+          </div>
+          <div class="fld">
+            <label for="uf_email">Alamat Email *</label>
+            <input type="email" id="uf_email" required placeholder="budi@contoh.id" maxlength="254">
+          </div>
+        </div>
+        <div class="fld">
+          <label for="uf_password">Kata Sandi *</label>
+          <input type="password" id="uf_password" required placeholder="Minimal 8 karakter" minlength="8" maxlength="72">
+        </div>
+        <div class="err" id="userFormErr" hidden></div>
+        <div style="display:flex;justify-content:flex-end;gap:.5rem">
+          <button class="btn ghost sm" type="button" id="userCancel">Batal</button>
+          <button class="btn sm" type="submit">Simpan Pengguna</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="tw">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Nama</th>
+            <th>Email</th>
+            <th>Peran</th>
+            <th>Bergabung</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="userTableBody"></tbody>
+      </table>
+    </div>
+  </main>
 
   <script src="../js/main.js"></script>
 </body>

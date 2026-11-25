@@ -5,23 +5,38 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Dasbor Admin | FoodHub</title>
   <link rel="icon" href="../img/logo-foodhub.jpg">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;0,800;1,600&family=Outfit:wght@400;500;600&display=swap">
   <link rel="stylesheet" href="../css/style.css">
 </head>
 <body data-page="dasbor" data-root="../" data-access="admin">
-  <div class="adm">
-    <aside id="side"></aside>
-    <div>
-      <header id="top"></header>
-      <main class="adm-c">
-        <h1>Dasbor</h1>
-        <div id="ds"></div>
-      </main>
-    </div>
-  </div>
+  <header id="top"></header>
+  <nav id="side"></nav>
 
-  <script src="../js/main.js?v=2"></script>
+  <main class="adm-c">
+    <h1>Dasbor</h1>
+    <div id="ds">
+      <div class="stat">
+        <div class="panel"><b id="statTotal">0</b>Total resep</div>
+        <div class="panel"><b id="statTayang">0</b>Resep tayang</div>
+        <div class="panel"><b id="statSembunyi">0</b>Disembunyikan</div>
+        <div class="panel"><b id="statPengguna">0</b>Pengguna</div>
+      </div>
+      <div class="row">
+        <div class="grow">
+          <b>Kelola Resep</b><br>
+          <span class="muted sm">Tambah, edit, hapus, dan atur status tayang resep.</span>
+        </div>
+        <a class="btn sm" href="kelola-resep.html">Buka</a>
+      </div>
+      <div class="row">
+        <div class="grow">
+          <b>Kelola Pengguna</b><br>
+          <span class="muted sm">Lihat, tambah, dan hapus akun member.</span>
+        </div>
+        <a class="btn sm" href="kelola-pengguna.html">Buka</a>
+      </div>
+    </div>
+  </main>
+
+  <script src="../js/main.js"></script>
 </body>
 </html>
