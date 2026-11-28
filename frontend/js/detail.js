@@ -14,8 +14,10 @@ function kerangkaDetail(resep) {
     <div class="panel">
       <div>${kategori}</div>
       <h1>${esc(resep.title)}</h1>
+      ${foto
+        ? `<img class="foto-detail" src="${foto}" alt="Foto ${esc(resep.title)}" loading="eager">`
+        : '<div class="foto-detail foto-detail-kosong" role="img" aria-label="Foto resep belum tersedia">Foto resep belum tersedia</div>'}
       <p class="muted sm">Oleh ${esc(resep.author || 'FoodHub')}</p>
-      ${foto ? `<img class="foto-detail" src="${foto}" alt="${esc(resep.title)}">` : ''}
       <div class="detail-info">
         <span>Waktu: <b>${resep.cook_time_minutes || 30} mnt</b></span>
         <span>Porsi: <b id="sv"></b></span>
