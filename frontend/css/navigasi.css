@@ -1,0 +1,145 @@
+/* FoodHub - navigasi.css
+   Header, menu navigasi, avatar, dan dropdown akun. */
+
+#nav,
+#header-atas,
+#menu-samping {
+  background: var(--putih);
+  border-bottom: 2px solid var(--hitam);
+  padding: 0.8rem 0;
+}
+
+#menu-samping {
+  margin-bottom: 1.5rem;
+  padding: 0.6rem 0;
+}
+
+.nb,
+.nl,
+.na {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.nb {
+  justify-content: space-between;
+}
+
+.logo,
+.card {
+  display: flex;
+  color: inherit;
+  text-decoration: none;
+}
+
+.logo {
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.logo img {
+  height: 38px;
+  width: auto;
+  border-radius: 6px;
+  object-fit: contain;
+}
+
+.nl a,
+#menu-samping a,
+#menu-samping button,
+.dd a,
+.dd button {
+  padding: 0.4rem 0.9rem;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--hitam);
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.nl a:hover,
+#menu-samping a:hover {
+  color: var(--merah);
+}
+
+.nl a.on,
+#menu-samping a.on,
+.chip.on {
+  background: var(--hitam);
+  color: var(--putih);
+}
+
+/* Avatar dan dropdown akun */
+.acc {
+  position: relative;
+}
+
+.av {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--hitam);
+  border-radius: 50%;
+  background: var(--kuning);
+  color: var(--hitam);
+  font-size: 1.1rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 var(--hitam);
+}
+
+.dd {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 100;
+  min-width: 230px;
+  padding: 0.6rem;
+  border: 2px solid var(--hitam);
+  border-radius: 12px;
+  background: var(--putih);
+  box-shadow: var(--bayangan);
+}
+
+.dd .dn {
+  margin-bottom: 0.4rem;
+  padding: 0.6rem 0.8rem 0.8rem;
+  border-bottom: 2px solid #f5f5f4;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.dd .dn small {
+  display: block;
+  margin-top: 0.2rem;
+  color: #78716c;
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+
+.dd a,
+.dd button {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  text-align: left;
+}
+
+.dd a:hover,
+.dd button:hover {
+  background: var(--krem);
+  color: var(--merah);
+}
+
+.dd #lo {
+  margin-top: 0.3rem;
+  border-top: 1px dashed #e7e5e4;
+  color: var(--merah);
+}

@@ -8,6 +8,11 @@
   <title>Beranda | FoodHub</title>
   <link rel="icon" href="img/logo-foodhub.jpg">
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/tombol.css">
+  <link rel="stylesheet" href="css/form.css">
+  <link rel="stylesheet" href="css/navigasi.css">
+  <link rel="stylesheet" href="css/komponen.css">
+  <link rel="stylesheet" href="css/halaman.css">
 </head>
 <!-- Bagian badan: semua konten yang tampil di browser -->
 <body data-page="index" data-root="" data-access="">
@@ -42,16 +47,16 @@
       </div>
       <div class="grid" id="pop"></div>
 
-      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-top:2.5rem;">
-        <div class="panel" style="background:#dc2626;color:#ffffff;box-shadow:4px 4px 0 #1c1917;">
+      <div class="grid home-feature-grid">
+        <div class="panel home-highlight home-highlight--recipes">
           <h3 style="margin-top:0;">Jelajahi semua resep</h3>
-          <p style="margin:0.5rem 0 1.2rem;opacity:0.9;">Filter berdasarkan kategori, waktu memasak, dan tingkat kesulitan.</p>
-          <a class="btn" style="background:#1c1917;color:#fff;border-color:#1c1917;" href="daftar-resep.html">Lihat Daftar Resep</a>
+          <p>Filter berdasarkan kategori, waktu memasak, dan tingkat kesulitan.</p>
+          <a class="btn" href="daftar-resep.html">Lihat Daftar Resep</a>
         </div>
-        <div class="panel" style="background:#facc15;color:#1c1917;box-shadow:4px 4px 0 #1c1917;">
+        <div class="panel home-highlight home-highlight--faq">
           <h3 style="margin-top:0;">Punya pertanyaan?</h3>
-          <p style="margin:0.5rem 0 1.2rem;color:#44403c;">Temukan jawaban seputar penggunaan dan fitur FoodHub.</p>
-          <a class="btn" style="background:#1c1917;color:#fff;border-color:#1c1917;" href="faq.html">Buka FAQ</a>
+          <p>Temukan jawaban seputar penggunaan dan fitur FoodHub.</p>
+          <a class="btn ghost" href="faq.html">Buka FAQ</a>
         </div>
       </div>
     </section>
@@ -63,5 +68,8 @@
     </div>
   </footer>
   <script src="js/main.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/publik.js"></script>
+  <script src="js/navigasi.js"></script>
 </body>
 </html>
