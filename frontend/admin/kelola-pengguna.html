@@ -1,5 +1,7 @@
+﻿<!-- Deklarasi dokumen HTML5 -->
 <!DOCTYPE html>
 <html lang="id">
+<!-- Bagian kepala: metadata, judul tab, ikon, dan file CSS -->
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,61 +9,73 @@
   <link rel="icon" href="../img/logo-foodhub.jpg">
   <link rel="stylesheet" href="../css/style.css">
 </head>
+<!-- Bagian badan: semua konten yang tampil di browser -->
 <body data-page="kelola-pengguna" data-root="../" data-access="admin">
-  <header id="top"></header>
-  <nav id="side"></nav>
+  <!-- Header atas dan menu samping (diisi otomatis oleh main.js) -->
+  <header id="header-atas"></header>
+  <nav id="menu-samping"></nav>
 
-  <main class="adm-c">
-    <div class="sec-h">
+  <!-- Konten utama halaman -->
+  <main class="admin-konten">
+    <!-- Judul halaman dan tombol untuk membuka form tambah pengguna -->
+    <div class="kepala-bagian">
       <div>
         <h1>Kelola Pengguna</h1>
-        <p class="muted sm">Lihat, tambah, dan hapus akun pengguna di FoodHub.</p>
+        <p class="teks-redup kecil">Lihat, tambah, dan hapus akun pengguna di FoodHub.</p>
       </div>
-      <button class="btn sm" id="btnTambahPengguna" type="button">+ Tambah Pengguna</button>
+      <button class="tombol kecil" id="btnTambahPengguna" type="button">+ Tambah Pengguna</button>
     </div>
 
+    <!-- Form tambah pengguna baru (awalnya disembunyikan dengan atribut hidden) -->
     <div class="panel" id="userPanel" hidden>
       <h2 style="margin-bottom:1rem">Tambah Pengguna Baru</h2>
       <form id="userForm" novalidate>
-        <div class="fld-row">
-          <div class="fld">
-            <label for="uf_name">Nama Lengkap *</label>
-            <input type="text" id="uf_name" required placeholder="Contoh: Budi Santoso" minlength="3" maxlength="100">
+        <div class="baris-input">
+          <div class="kolom-input">
+            <label for="pengguna-nama">Nama Lengkap *</label>
+            <input type="text" id="pengguna-nama" required placeholder="Contoh: Budi Santoso" minlength="3" maxlength="100">
           </div>
-          <div class="fld">
-            <label for="uf_email">Alamat Email *</label>
-            <input type="email" id="uf_email" required placeholder="budi@contoh.id" maxlength="254">
+          <div class="kolom-input">
+            <label for="pengguna-email">Alamat Email *</label>
+            <input type="email" id="pengguna-email" required placeholder="budi@contoh.id" maxlength="254">
           </div>
         </div>
-        <div class="fld">
-          <label for="uf_password">Kata Sandi *</label>
-          <input type="password" id="uf_password" required placeholder="Minimal 8 karakter" minlength="8" maxlength="72">
-        </div>
-        <div class="err" id="userFormErr" hidden></div>
-        <div style="display:flex;justify-content:flex-end;gap:.5rem">
-          <button class="btn ghost sm" type="button" id="userCancel">Batal</button>
-          <button class="btn sm" type="submit">Simpan Pengguna</button>
-        </div>
-      </form>
-    </div>
 
-    <div class="tw">
+        <div class="kolom-input">
+        <label for="pengguna-sandi">Kata Sandi *</label>
+     <input type="password" id="pengguna-sandi" required placeholder="Minimal 8 karakter" minlength="8" maxlength="72">
+     </div>
+
+      <!-- Tempat menampilkan pesan error jika input tidak valid -->
+      <div class="kotak-error" id="userFormErr" hidden></div>
+
+      <div style="display:flex;justify-content:flex-end;gap:.5rem">
+      <button class="tombol ghost kecil" type="button" id="userCancel">Batal</button>
+      <button class="tombol kecil" type="submit">Simpan Pengguna</button>
+     </div>
+   </form>
+</div>
+
+    <!-- Tabel daftar semua pengguna -->
+    <div class="wadah-tabel">
       <table>
         <thead>
           <tr>
-            <th>ID</th>
-            <th>Nama</th>
-            <th>Email</th>
-            <th>Peran</th>
-            <th>Bergabung</th>
-            <th>Aksi</th>
+    <th>ID</th>
+    <th>Nama</th>
+    <th>Email</th>
+    <th>Peran</th>
+    <th>Bergabung</th>
+    <th>Aksi</th>
           </tr>
-        </thead>
-        <tbody id="userTableBody"></tbody>
-      </table>
-    </div>
-  </main>
+    </thead>
+        <!-- Isi baris tabel diisi otomatis oleh main.js -->
+    <tbody id="userTableBody"></tbody>
+    </table>
+   </div>
+ </main>
 
-  <script src="../js/main.js"></script>
+  <!-- Menghubungkan file JavaScript -->
+ <script src="../js/main.js"></script>
 </body>
 </html>

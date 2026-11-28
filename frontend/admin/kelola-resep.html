@@ -1,5 +1,7 @@
+﻿<!-- Deklarasi dokumen HTML5 -->
 <!DOCTYPE html>
 <html lang="id">
+<!-- Bagian kepala: metadata, judul tab, ikon, dan file CSS -->
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,25 +9,43 @@
   <link rel="icon" href="../img/logo-foodhub.jpg">
   <link rel="stylesheet" href="../css/style.css">
 </head>
+<!-- Bagian badan: semua konten yang tampil di browser -->
 <body data-page="kelola-resep" data-root="../" data-access="admin">
-  <header id="top"></header>
-  <nav id="side"></nav>
+  <!-- Header atas dan menu samping (diisi otomatis oleh main.js) -->
+  <header id="header-atas"></header>
+  <nav id="menu-samping"></nav>
 
-  <main class="adm-c">
-    <div class="sec-h">
-      <div><h1>Kelola Resep</h1><p class="muted sm">Tambah, edit, hapus, atau atur status resep.</p></div>
-      <button class="btn sm" id="btnTambahResep" type="button">+ Tambah Resep</button>
+  <!-- Konten utama halaman -->
+  <main class="admin-konten">
+    <!-- Judul halaman dan tombol untuk membuka form tambah resep -->
+    <div class="kepala-bagian">
+      <div>
+        <h1>Kelola Resep</h1>
+        <p class="teks-redup kecil">Tambah, edit, hapus, atau atur status resep.</p>
+      </div>
+      <button class="tombol kecil" id="btnTambahResep" type="button">+ Tambah Resep</button>
     </div>
 
+    <!-- Form tambah / edit resep (awalnya disembunyikan dengan atribut hidden) -->
     <div class="panel" id="recipePanel" hidden>
       <h2 id="modalTitle">Tambah Resep Baru</h2>
       <form id="recipeForm" novalidate>
-        <input type="hidden" id="rf_id">
-        <div class="fld"><label for="rf_n">Nama Resep *</label><input id="rf_n" required></div>
-        <div class="fld"><label for="rf_p">Asal Daerah</label><input id="rf_p"></div>
-        <div class="fld">
-          <label for="rf_k">Kategori</label>
-          <select id="rf_k">
+        <!-- Menyimpan ID resep saat mode edit -->
+        <input type="hidden" id="resep-id">
+
+        <div class="kolom-input">
+          <label for="resep-nama">Nama Resep *</label>
+          <input id="resep-nama" required>
+        </div>
+
+        <div class="kolom-input">
+          <label for="resep-daerah">Asal Daerah</label>
+          <input id="resep-daerah">
+        </div>
+
+        <div class="kolom-input">
+          <label for="resep-kategori">Kategori</label>
+          <select id="resep-kategori">
             <option value="Makanan Berat">Makanan Berat</option>
             <option value="Sehat">Sehat</option>
             <option value="Minuman">Minuman</option>
@@ -33,37 +53,73 @@
             <option value="Anak Kos">Anak Kos</option>
           </select>
         </div>
-        <div class="fld"><label for="rf_w">Waktu Memasak (menit)</label><input type="number" id="rf_w" min="1" value="45"></div>
-        <div class="fld">
-          <label for="rf_l">Tingkat Kesulitan</label>
-          <select id="rf_l">
+
+        <div class="kolom-input">
+          <label for="resep-waktu">Waktu Memasak (menit)</label>
+          <input type="number" id="resep-waktu" min="1" value="45">
+        </div>
+
+        <div class="kolom-input">
+          <label for="resep-kesulitan">Tingkat Kesulitan</label>
+          <select id="resep-kesulitan">
             <option value="mudah">Mudah</option>
             <option value="sedang" selected>Sedang</option>
             <option value="sulit">Sulit</option>
           </select>
         </div>
-        <div class="fld"><label for="rf_s">Porsi (orang)</label><input type="number" id="rf_s" min="1" value="4"></div>
-        <div class="fld"><label for="rf_file">Foto Resep (Maks. 5 MB)</label><input type="file" id="rf_file" accept="image/*"></div>
-        <div class="fld"><label for="rf_c">Deskripsi Singkat *</label><textarea id="rf_c" rows="2" required></textarea></div>
-        <div class="fld"><label for="rf_b">Bahan (Nama, Jumlah, Satuan per baris)</label><textarea id="rf_b" rows="3"></textarea></div>
-        <div class="fld"><label for="rf_t">Langkah Memasak (1 langkah per baris)</label><textarea id="rf_t" rows="3"></textarea></div>
+
+        <div class="kolom-input">
+          <label for="resep-porsi">Porsi (orang)</label>
+          <input type="number" id="resep-porsi" min="1" value="4">
+        </div>
+
+        <div class="kolom-input">
+          <label for="resep-foto">Foto Resep (Maks. 5 MB)</label>
+          <input type="file" id="resep-foto" accept="image/*">
+        </div>
+
+        <div class="kolom-input">
+          <label for="resep-deskripsi">Deskripsi Singkat *</label>
+          <textarea id="resep-deskripsi" rows="2" required></textarea>
+        </div>
+
+        <div class="kolom-input">
+          <label for="resep-bahan">Bahan (Nama, Jumlah, Satuan per baris)</label>
+          <textarea id="resep-bahan" rows="3"></textarea>
+        </div>
+
+        <div class="kolom-input">
+          <label for="resep-langkah">Langkah Memasak (1 langkah per baris)</label>
+          <textarea id="resep-langkah" rows="3"></textarea>
+        </div>
+
         <div style="display:flex;gap:.5rem;justify-content:flex-end">
-          <button class="btn ghost sm" type="button" id="formCancel">Batal</button>
-          <button class="btn sm" type="submit">Simpan Resep</button>
+          <button class="tombol ghost kecil" type="button" id="formCancel">Batal</button>
+          <button class="tombol kecil" type="submit">Simpan Resep</button>
         </div>
       </form>
     </div>
 
-    <div class="tw">
+    <!-- Tabel daftar semua resep -->
+    <div class="wadah-tabel">
       <table>
         <thead>
-          <tr><th>Foto</th><th>Nama Resep</th><th>Kategori</th><th>Waktu</th><th>Status</th><th>Aksi</th></tr>
+          <tr>
+            <th>Foto</th>
+            <th>Nama Resep</th>
+            <th>Kategori</th>
+            <th>Waktu</th>
+            <th>Status</th>
+            <th>Aksi</th>
+          </tr>
         </thead>
+        <!-- Isi baris tabel diisi otomatis oleh main.js -->
         <tbody id="resepTableBody"></tbody>
       </table>
     </div>
   </main>
 
+  <!-- Menghubungkan file JavaScript -->
   <script src="../js/main.js"></script>
 </body>
 </html>

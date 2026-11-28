@@ -1,83 +1,125 @@
-:root {
-  --primary: #e85d04; --bg: #f8f9fa; --surface: #fff;
-  --text: #1f2937; --muted: #6b7280; --border: #e5e7eb;
-  --success: #16a34a; --danger: #dc2626; --star: #f59e0b;
-}
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
-a { color: inherit; text-decoration: none; }
-.container { max-width: 1140px; margin: 0 auto; padding: 0 16px; }
+/* CSS Sederhana FoodHub untuk Belajar Pemrograman Web */
 
-/* Tombol & Form */
-.btn {
-  padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border);
-  background: var(--surface); font-weight: 600; cursor: pointer; font-size: 0.9rem;
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f4f4f4;
+  color: #333333;
+  margin: 0;
+  padding: 0;
 }
-.btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
-.btn-danger { background: var(--danger); color: #fff; border-color: var(--danger); }
-.btn-sm { padding: 4px 10px; font-size: 0.8rem; }
+
+a {
+  color: #e85d04;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+.container {
+  width: 90%;
+  max-width: 1000px;
+  margin: 20px auto;
+}
+
+.teks-redup {
+  color: #666666;
+}
+
+.kecil {
+  font-size: 13px;
+}
+
+header {
+  background-color: #ffffff;
+  border-bottom: 2px solid #dddddd;
+  padding: 15px 20px;
+}
+
+footer {
+  background-color: #ffffff;
+  border-top: 1px solid #dddddd;
+  padding: 15px 20px;
+  text-align: center;
+  margin-top: 30px;
+}
+
+.tombol, .btn {
+  display: inline-block;
+  padding: 8px 16px;
+  background-color: #e85d04;
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.tombol:hover, .btn:hover {
+  background-color: #c84b00;
+}
+
+.tombol.ghost, .btn.ghost {
+  background-color: #eeeeee;
+  color: #333333;
+  border: 1px solid #cccccc;
+}
+
+.panel, .formbox {
+  background-color: #ffffff;
+  border: 1px solid #cccccc;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.kolom-input, .fld {
+  margin-bottom: 12px;
+}
+
+label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
 input, select, textarea {
-  width: 100%; padding: 8px 12px; border: 1px solid var(--border);
-  border-radius: 8px; font: inherit; background: var(--surface);
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #cccccc;
+  box-sizing: border-box;
 }
-input:focus, select:focus, textarea:focus { outline: 2px solid #fed7aa; border-color: var(--primary); }
 
-/* Beranda: Search & Chip Kategori */
-.hero-search { display: flex; gap: 8px; max-width: 560px; margin: 16px auto; }
-.hero-search input, .hero-search button { border-radius: 99px; }
-.category-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 16px 0; }
-.chip {
-  padding: 6px 16px; border-radius: 99px; border: 1px solid var(--border);
-  background: var(--surface); cursor: pointer; font-size: 0.88rem;
+.kotak-error, .err {
+  background-color: #ffdddd;
+  color: #cc0000;
+  border: 1px solid #cc0000;
+  padding: 10px;
+  margin-bottom: 12px;
 }
-.chip.active, .chip:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
 
-/* Daftar Resep: Filter & Kartu */
-.filter-bar {
-  display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 10px;
-  background: var(--surface); padding: 14px; border-radius: 10px; margin-bottom: 20px;
+.admin-konten {
+  padding: 20px;
 }
-.recipes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 18px; }
-.recipe-card { background: var(--surface); border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
-.recipe-card img { width: 100%; height: 165px; object-fit: cover; display: block; }
-.recipe-card-body { padding: 12px; display: flex; flex-direction: column; gap: 6px; }
-.recipe-meta { font-size: 0.8rem; color: var(--muted); }
 
-/* Detail Resep: Porsi (+/-), Takaran Bahan & Ulasan */
-.servings-control {
-  display: inline-flex; align-items: center; gap: 10px;
-  background: #fff1e6; padding: 6px 12px; border-radius: 99px; margin: 10px 0;
+.baris {
+  background-color: #ffffff;
+  border: 1px solid #cccccc;
+  padding: 12px;
+  margin-bottom: 10px;
 }
-.servings-btn {
-  width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--primary);
-  background: #fff; color: var(--primary); font-weight: 700; cursor: pointer;
-}
-.ingredients-list { list-style: none; display: grid; gap: 8px; margin-top: 10px; }
-.ingredient-item { display: flex; gap: 8px; padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
-.ing-measure { font-weight: 700; color: var(--primary); min-width: 90px; }
-.reviews-section { margin-top: 28px; padding: 20px; background: var(--surface); border-radius: 10px; border: 1px solid var(--border); }
-.star-picker button { background: none; border: none; font-size: 1.5rem; color: #d1d5db; cursor: pointer; }
-.star-picker button.active { color: var(--star); }
-.review-item { padding: 12px 0; border-bottom: 1px solid var(--border); }
 
-/* Admin: Dasbor, Tabel, Badge & Modal */
-.admin-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px; }
-.stat-card { background: var(--surface); padding: 16px; border-radius: 10px; border-left: 4px solid var(--primary); }
-.stat-card-value { font-size: 1.6rem; font-weight: 800; }
-.table-wrapper { background: var(--surface); border-radius: 10px; overflow-x: auto; border: 1px solid var(--border); }
-.admin-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
-.admin-table th, .admin-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
-.admin-table th { background: #f3f4f6; }
-.table-thumb { width: 48px; height: 36px; object-fit: cover; border-radius: 4px; }
-.badge { padding: 3px 9px; border-radius: 99px; font-size: 0.78rem; font-weight: 600; }
-.badge-success { background: #dcfce7; color: var(--success); }
-.badge-warning { background: #fef3c7; color: #b45309; }
-.badge-danger { background: #fee2e2; color: var(--danger); }
-.modal-backdrop {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-  display: none; align-items: center; justify-content: center; padding: 16px; z-index: 999;
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: #ffffff;
 }
-.modal-backdrop.open { display: flex; }
-.modal-dialog { background: var(--surface); width: 100%; max-width: 540px; max-height: 90vh; overflow-y: auto; padding: 20px; border-radius: 10px; }
-.form-group { margin-bottom: 10px; }
-@media (max-width: 768px) { .filter-bar { grid-template-columns: 1fr; } }
+
+th, td {
+  border: 1px solid #cccccc;
+  padding: 10px;
+  text-align: left;
+}
+
+th {
+  background-color: #eeeeee;
+}

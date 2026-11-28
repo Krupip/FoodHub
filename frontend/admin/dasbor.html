@@ -1,5 +1,7 @@
+﻿<!-- Deklarasi dokumen HTML5 -->
 <!DOCTYPE html>
 <html lang="id">
+<!-- Bagian kepala: metadata, judul tab, ikon, dan file CSS -->
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,32 +9,34 @@
   <link rel="icon" href="../img/logo-foodhub.jpg">
   <link rel="stylesheet" href="../css/style.css">
 </head>
+<!-- Bagian badan: semua konten yang tampil di browser -->
 <body data-page="dasbor" data-root="../" data-access="admin">
-  <header id="top"></header>
-  <nav id="side"></nav>
+  <!-- Header atas dan menu samping -->
+  <header id="header-atas"></header>
+  <nav id="menu-samping"></nav>
 
-  <main class="adm-c">
+  <main class="admin-konten">
     <h1>Dasbor</h1>
-    <div id="ds">
-      <div class="stat">
+    <div id="dasbor-statistik">
+      <div class="kotak-statistik">
         <div class="panel"><b id="statTotal">0</b>Total resep</div>
         <div class="panel"><b id="statTayang">0</b>Resep tayang</div>
         <div class="panel"><b id="statSembunyi">0</b>Disembunyikan</div>
         <div class="panel"><b id="statPengguna">0</b>Pengguna</div>
       </div>
-      <div class="row">
-        <div class="grow">
+      <div class="baris">
+        <div class="lebar">
           <b>Kelola Resep</b><br>
-          <span class="muted sm">Tambah, edit, hapus, dan atur status tayang resep.</span>
+          <span class="teks-redup kecil">Tambah, edit, hapus, dan atur status tayang resep.</span>
         </div>
-        <a class="btn sm" href="kelola-resep.html">Buka</a>
+        <a class="tombol kecil" href="kelola-resep.html">Buka</a>
       </div>
-      <div class="row">
+      <div class="baris">
         <div class="grow">
           <b>Kelola Pengguna</b><br>
-          <span class="muted sm">Lihat, tambah, dan hapus akun member.</span>
+          <span class="teks-redup kecil">Lihat, tambah, dan hapus akun member.</span>
         </div>
-        <a class="btn sm" href="kelola-pengguna.html">Buka</a>
+        <a class="btn kecil" href="kelola-pengguna.html">Buka</a>
       </div>
     </div>
   </main>
