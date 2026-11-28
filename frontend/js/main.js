@@ -425,20 +425,55 @@
         const elemenPopuler = pilihElemen('#pop');
         if (elemenPopuler) elemenPopuler.innerHTML = recipes.map(buatKartuResepHtml).join('');
       } catch {}
+
+      // Tangani klik pada chip kategori di beranda
+      pilihSemuaElemen('.chips .chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          pilihSemuaElemen('.chips .chip').forEach(c => c.classList.remove('on'));
+          chip.classList.add('on');
+        });
+      });
     },
 
     // 6.2. Halaman Daftar Resep (Katalog & Pencarian)
     async 'daftar-resep'() {
       const inputCari = pilihElemen('#fq');
+      const selectKategori = pilihElemen('#fk');
+      const kontainerHasil = pilihElemen('#rl');
+
+      // Ambil nilai awal dari query string URL jika ada
+      const kataKunciUrl = parameterUrl.get('q') || parameterUrl.get('cari') || '';
+      const kategoriUrl = parameterUrl.get('category') || parameterUrl.get('kategori') || '';
+
+      if (inputCari && kataKunciUrl) inputCari.value = kataKunciUrl;
+      if (selectKategori && kategoriUrl) selectKategori.value = kategoriUrl;
+
       const jalankanPencarian = async () => {
         try {
-          const kataKunci = encodeURIComponent(inputCari?.value || '');
-          const { recipes } = await api('recipes.php?q=' + kataKunci);
-          const daftarHasil = pilihElemen('#rl');
-          if (daftarHasil) daftarHasil.innerHTML = recipes.map(buatKartuResepHtml).join('');
-        } catch {}
+          const kataKunci = encodeURIComponent((inputCari?.value || '').trim());
+          const kategori = encodeURIComponent((selectKategori?.value || '').trim());
+          let queryParams = [];
+          if (kataKunci) queryParams.push('q=' + kataKunci);
+          if (kategori) queryParams.push('category=' + kategori);
+
+          const queryString = queryParams.length ? '?' + queryParams.join('&') : '';
+          const respons = await api('recipes.php' + queryString);
+          const daftarResep = respons?.recipes || [];
+
+          if (kontainerHasil) {
+            kontainerHasil.innerHTML = daftarResep.length > 0
+              ? daftarResep.map(buatKartuResepHtml).join('')
+              : '<div class="panel" style="grid-column:1/-1;text-align:center;"><p class="teks-redup">Tidak ada resep yang sesuai dengan pencarian Anda.</p></div>';
+          }
+        } catch {
+          if (kontainerHasil) {
+            kontainerHasil.innerHTML = '<div class="panel" style="grid-column:1/-1;text-align:center;"><p class="teks-redup">Gagal memuat resep.</p></div>';
+          }
+        }
       };
+
       inputCari?.addEventListener('input', jalankanPencarian);
+      selectKategori?.addEventListener('change', jalankanPencarian);
       jalankanPencarian();
     },
 
@@ -464,83 +499,80 @@
 
       let statusFavorit = Boolean(dataResep.is_favorite);
       const tagKategori = (dataResep.categories || []).map(kat => `<span class="tag">${bersihkanTeks(kat)}</span>`).join(' ');
-      
-      const takaranDasarPorsi = Number(dataResep.servings) || 4;
-      let porsiSekarang = takaranDasarPorsi;
-
-      const formatBahanHtml = (daftarBahan, porsiPengali, porsiDasar) => {
-        return daftarBahan.map(bahan => {
-          let jumlahTeks = '';
-          if (bahan.quantity != null && !isNaN(bahan.quantity)) {
-            const jumlahTerkalkulasi = (Number(bahan.quantity) * porsiPengali) / porsiDasar;
-            const jumlahBulat = Math.round(jumlahTerkalkulasi * 10) / 10;
-            jumlahTeks = `<b>${jumlahBulat}</b> ${bersihkanTeks(bahan.unit || '')} `;
-          } else if (bahan.unit) {
-            jumlahTeks = `${bersihkanTeks(bahan.unit)} `;
-          }
-          return `<li>${jumlahTeks}${bersihkanTeks(bahan.name)}</li>`;
-        }).join('');
-      };
-
+      const daftarBahan = dataResep.ingredients.map(bahan => `<li>${bersihkanTeks(bahan.name)}</li>`).join('');
       const daftarLangkah = dataResep.steps.map(langkah => `<li>${bersihkanTeks(langkah)}</li>`).join('');
+
       const ratingFormat = dataResep.avg_rating != null ? Number(dataResep.avg_rating).toFixed(1) : '-';
+      const infoRingkas = `<span>Waktu: <b>${dataResep.cook_time_minutes || 30} mnt</b></span><span>Porsi: <b id="sv">${dataResep.servings || 4}</b></span><span>Rating: <b id="rt">★ ${ratingFormat}</b></span>`;
 
-      const renderKontenDetail = () => {
-        const infoRingkas = `
-          <span>Waktu: <b>${dataResep.cook_time_minutes || 30} mnt</b></span>
-          <span style="display:inline-flex;align-items:center;gap:0.4rem;">
-            Porsi: 
-            <button type="button" id="btnPorsiMinus" class="btn sm ghost" style="padding:0.15rem 0.55rem;font-size:0.9rem;border-radius:99px;" ${porsiSekarang <= 1 ? 'disabled' : ''}>&minus;</button>
-            <b id="sv">${porsiSekarang}</b>
-            <button type="button" id="btnPorsiPlus" class="btn sm ghost" style="padding:0.15rem 0.55rem;font-size:0.9rem;border-radius:99px;">&plus;</button>
-          </span>
-          <span>Rating: <b id="rt">★ ${ratingFormat}</b></span>`;
+      kotakDetail.innerHTML = `
+        <div class="panel">
+          <div>${tagKategori}</div>
+          <h1>${bersihkanTeks(dataResep.title)}</h1>
+          <p class="muted sm">Oleh ${bersihkanTeks(dataResep.author || 'FoodHub')}</p>
+          <div class="detail-info">${infoRingkas}</div>
+          <div style="margin:1rem 0;display:flex;align-items:center;gap:0.8rem;">
+            <span>Atur Porsi:</span>
+            <button class="btn sm ghost" id="btnMinus" type="button" style="padding:0.2rem 0.7rem;font-size:1.1rem;">−</button>
+            <b id="porsiDisplay">${dataResep.servings || 4}</b>
+            <button class="btn sm ghost" id="btnPlus" type="button" style="padding:0.2rem 0.7rem;font-size:1.1rem;">+</button>
+          </div>
+          ${dataResep.story ? `<p>${bersihkanTeks(dataResep.story)}</p>` : ''}
+          <button class="btn sm" id="fv" type="button">&hearts; <span id="fvt">${statusFavorit ? 'Tersimpan di Favorit' : 'Simpan ke Favorit'}</span></button>
+          <h2>Bahan-bahan</h2>
+          <ul id="bahanList">${daftarBahan}</ul>
+          <h2>Langkah Memasak</h2>
+          <ol>${daftarLangkah}</ol>
+        </div>`;
 
-        kotakDetail.innerHTML = `
-          <div class="panel">
-            <div>${tagKategori}</div>
-            <h1 style="margin:0.5rem 0;">${bersihkanTeks(dataResep.title)}</h1>
-            <p class="muted sm">Oleh ${bersihkanTeks(dataResep.author || 'FoodHub')}</p>
-            <div class="detail-info">${infoRingkas}</div>
-            ${dataResep.story ? `<p style="line-height:1.7;">${bersihkanTeks(dataResep.story)}</p>` : ''}
-            <button class="btn sm" id="fv" type="button" style="margin-bottom:1.5rem;">&hearts; <span id="fvt">${statusFavorit ? 'Tersimpan di Favorit' : 'Simpan ke Favorit'}</span></button>
-            <h2>Bahan-bahan (${porsiSekarang} porsi)</h2>
-            <ul id="daftarBahanList" style="line-height:1.8;">${formatBahanHtml(dataResep.ingredients, porsiSekarang, takaranDasarPorsi)}</ul>
-            <h2 style="margin-top:1.5rem;">Langkah Memasak</h2>
-            <ol style="line-height:1.8;">${daftarLangkah}</ol>
-          </div>`;
-
-        pilihElemen('#btnPorsiMinus')?.addEventListener('click', () => {
-          if (porsiSekarang > 1) {
-            porsiSekarang--;
-            renderKontenDetail();
-          }
-        });
-
-        pilihElemen('#btnPorsiPlus')?.addEventListener('click', () => {
-          porsiSekarang++;
-          renderKontenDetail();
-        });
-
-        pilihElemen('#fv')?.addEventListener('click', async () => {
-          if (!penggunaAktif) return location.href = akarFolder + 'masuk.html';
-          try {
-            if (statusFavorit) {
-              await api('favorites.php?recipe_id=' + encodeURIComponent(idResep), { method: 'DELETE' });
-              statusFavorit = false;
-              pilihElemen('#fvt').textContent = 'Simpan ke Favorit';
-            } else {
-              await api('favorites.php', { method: 'POST', body: { recipe_id: idResep } });
-              statusFavorit = true;
-              pilihElemen('#fvt').textContent = 'Tersimpan di Favorit';
-            }
-          } catch (error) {
-            tampilkanToast(error.message || 'Gagal.');
-          }
-        });
+      // Kalkulator porsi dinamis
+      let porsiSekarang = dataResep.servings || 4;
+      const baseServings = porsiSekarang;
+      const rawIngredients = dataResep.ingredients || [];
+      const renderBahan = porsi => {
+        const faktor = porsi / (baseServings || 1);
+        const ul = pilihElemen('#bahanList');
+        if (ul) {
+          ul.innerHTML = rawIngredients.map(b => {
+            const jml = b.quantity != null ? (Math.round(b.quantity * faktor * 10) / 10) : '';
+            const unit = b.unit ? ' ' + bersihkanTeks(b.unit) : '';
+            const teksJumlah = jml ? `<strong>${jml}${unit}</strong> ` : '';
+            return `<li>${teksJumlah}${bersihkanTeks(b.name)}</li>`;
+          }).join('');
+        }
+        const disp = pilihElemen('#porsiDisplay');
+        if (disp) disp.textContent = porsi;
+        const svEl = pilihElemen('#sv');
+        if (svEl) svEl.textContent = porsi;
       };
 
-      renderKontenDetail();
+      pilihElemen('#btnPlus')?.addEventListener('click', () => {
+        porsiSekarang++;
+        renderBahan(porsiSekarang);
+      });
+      pilihElemen('#btnMinus')?.addEventListener('click', () => {
+        if (porsiSekarang > 1) {
+          porsiSekarang--;
+          renderBahan(porsiSekarang);
+        }
+      });
+
+      pilihElemen('#fv')?.addEventListener('click', async () => {
+        if (!penggunaAktif) return location.href = akarFolder + 'masuk.html';
+        try {
+          if (statusFavorit) {
+            await api('favorites.php?recipe_id=' + encodeURIComponent(idResep), { method: 'DELETE' });
+            statusFavorit = false;
+            pilihElemen('#fvt').textContent = 'Simpan ke Favorit';
+          } else {
+            await api('favorites.php', { method: 'POST', body: { recipe_id: idResep } });
+            statusFavorit = true;
+            pilihElemen('#fvt').textContent = 'Tersimpan di Favorit';
+          }
+        } catch (error) {
+          tampilkanToast(error.message || 'Gagal.');
+        }
+      });
     },
 
     // 6.4. Halaman Profil Pengguna & Resep Favorit
@@ -651,12 +683,11 @@
 
     // 6.7. Halaman Statis & Panel Admin
     faq() {
-      const semuaDetails = pilihSemuaElemen('.faq details');
-      semuaDetails.forEach(detailEl => {
-        detailEl.addEventListener('toggle', () => {
-          if (detailEl.open) {
-            semuaDetails.forEach(el => {
-              if (el !== detailEl) el.open = false;
+      pilihSemuaElemen('.faq details').forEach(details => {
+        details.addEventListener('toggle', () => {
+          if (details.open) {
+            pilihSemuaElemen('.faq details').forEach(lain => {
+              if (lain !== details) lain.open = false;
             });
           }
         });
@@ -719,10 +750,10 @@
               <td>${resep.cook_time_minutes || 30} mnt</td>
               <td><span class="sts ${tayang ? 'tayang' : 'sembunyi'}">${tayang ? 'Tayang' : 'Draft'}</span></td>
               <td>
-                <div class="aksi-grup">
-                  <button class="btn-aksi ${tayang ? 'tarik' : 'tayang'}" type="button" data-pub="${resep.id}" data-v="${tayang ? 0 : 1}">${tayang ? 'Tarik' : 'Tayang'}</button>
-                  <button class="btn-aksi edit" type="button" data-edit="${resep.id}">Edit</button>
-                  <button class="btn-aksi hapus" type="button" data-del="${resep.id}">Hapus</button>
+                <div style="display:flex;gap:0.4rem;align-items:center;">
+                  <button class="btn sm ${tayang ? 'ghost' : ''}" type="button" data-pub="${resep.id}" data-v="${tayang ? 0 : 1}">${tayang ? 'Tarik' : 'Tayang'}</button>
+                  <button class="btn sm ghost" type="button" data-edit="${resep.id}">Edit</button>
+                  <button class="btn danger sm" type="button" data-del="${resep.id}">Hapus</button>
                 </div>
               </td>
             </tr>`;
