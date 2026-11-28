@@ -21,8 +21,25 @@ a:hover { text-decoration: underline; }
 .btn:hover, .tombol:hover { background: #b91c1c; transform: translate(-1px, -1px); box-shadow: 3px 3px 0 #1c1917; }
 .btn:active, .tombol:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 #1c1917; }
 .btn.ghost, .tombol.ghost { background: #ffffff; color: #1c1917; }
-.btn.danger { background: #fee2e2; color: #dc2626; border-color: #dc2626; }
-.btn.sm, .tombol.kecil { padding: 0.35rem 0.85rem; font-size: 0.85rem; }
+.btn.danger, .tombol.danger { background: #fee2e2; color: #dc2626; border-color: #dc2626; box-shadow: 2px 2px 0 #1c1917; }
+.btn.danger:hover, .tombol.danger:hover { background: #fecaca; }
+.btn.sm, .tombol.kecil { padding: 0.35rem 0.85rem; font-size: 0.85rem; font-weight: 700; border-radius: 99px; }
+
+/* Tombol Aksi Tabel Admin Persis Mockup Foto 2 */
+.aksi-grup { display: flex; gap: 0.5rem; align-items: center; }
+.btn-aksi {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0.35rem 0.9rem; border-radius: 99px; border: 2px solid #1c1917;
+  font-weight: 800; font-size: 0.85rem; text-decoration: none; cursor: pointer;
+  box-shadow: 2.5px 2.5px 0 #1c1917; transition: transform 0.1s, box-shadow 0.1s;
+}
+.btn-aksi:hover { transform: translate(-1px, -1px); box-shadow: 3.5px 3.5px 0 #1c1917; }
+.btn-aksi:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 #1c1917; }
+.btn-aksi.tarik { background: #ffffff; color: #1c1917; }
+.btn-aksi.tayang { background: #1c1917; color: #ffffff; }
+.btn-aksi.edit { background: #ffffff; color: #1c1917; }
+.btn-aksi.hapus { background: #fee2e2; color: #dc2626; border-color: #dc2626; }
+.btn-aksi.hapus:hover { background: #fecaca; }
 
 /* Navigasi & Header */
 #nav, #top, #side, #header-atas, #menu-samping { background: #ffffff; border-bottom: 2px solid #1c1917; padding: 0.8rem 0; }
@@ -43,6 +60,34 @@ a:hover { text-decoration: underline; }
 }
 .nl a:hover, #side a:hover, #menu-samping a:hover, .dd a:hover { color: #dc2626; }
 .nl a.on, #side a.on, #menu-samping a.on, .chip.on { background: #1c1917; color: #ffffff; }
+
+/* Menu Akun & Avatar Dropdown */
+.acc { position: relative; }
+.av {
+  width: 40px; height: 40px; border-radius: 50%; border: 2px solid #1c1917;
+  background: #facc15; color: #1c1917; font-weight: 800; font-size: 1.1rem;
+  cursor: pointer; display: grid; place-items: center; box-shadow: 2px 2px 0 #1c1917;
+  transition: transform 0.1s;
+}
+.av:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 #1c1917; }
+.dd {
+  position: absolute; right: 0; top: calc(100% + 8px); min-width: 230px;
+  background: #ffffff; border: 2px solid #1c1917; border-radius: 12px;
+  padding: 0.6rem; z-index: 100; box-shadow: 4px 4px 0 #1c1917;
+}
+.dd .dn {
+  padding: 0.6rem 0.8rem 0.8rem; border-bottom: 2px solid #f5f5f4; margin-bottom: 0.4rem;
+  font-weight: 700; color: #1c1917; line-height: 1.3;
+}
+.dd .dn small { display: block; font-weight: 400; color: #78716c; font-size: 0.8rem; margin-top: 0.2rem; }
+.dd a, .dd button {
+  display: block; width: 100%; text-align: left; padding: 0.5rem 0.8rem;
+  border-radius: 6px; text-decoration: none; color: #1c1917; font-weight: 600;
+  background: none; border: 0; cursor: pointer; font-size: 0.9rem;
+}
+.dd a:hover, .dd button:hover { background: #fef3c7; color: #dc2626; }
+.dd button#lo { color: #dc2626; border-top: 1px dashed #e7e5e4; margin-top: 0.3rem; padding-top: 0.6rem; }
+.dd button#lo:hover { background: #fee2e2; }
 
 /* Grid & Kartu Resep */
 .grid, .fld-row, .stat, .kotak-statistik { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1.2rem; }
