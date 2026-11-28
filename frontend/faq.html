@@ -1,5 +1,7 @@
+<!-- Deklarasi dokumen HTML5 -->
 <!DOCTYPE html>
 <html lang="id">
+<!-- Bagian kepala: metadata, judul tab, ikon, dan file CSS -->
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,6 +9,7 @@
   <link rel="icon" href="img/logo-foodhub.jpg">
   <link rel="stylesheet" href="css/style.css">
 </head>
+<!-- Bagian badan: semua konten yang tampil di browser -->
 <body data-page="faq" data-root="" data-access="">
   <header id="nav"></header>
 
@@ -17,25 +20,69 @@
         <p>Pertanyaan yang sering diajukan seputar penggunaan FoodHub.</p>
       </div>
 
-      <details>
-        <summary>Apa itu FoodHub?</summary>
-        <p>FoodHub adalah platform resep makanan Nusantara untuk mencari, mempelajari, dan menyimpan resep dengan takaran bahan yang jelas.</p>
-      </details>
+      <section class="faq-section" aria-labelledby="faq-pengunjung">
+        <h2 class="faq-section-title" id="faq-pengunjung">Untuk Pengunjung</h2>
+        <details open>
+          <summary>Apa itu FoodHub?</summary>
+          <p>FoodHub adalah platform resep makanan Nusantara untuk mencari, mempelajari, dan menyimpan resep dengan takaran bahan yang jelas.</p>
+        </details>
 
-      <details>
-        <summary>Apakah saya harus punya akun untuk melihat resep?</summary>
-        <p>Tidak. Semua pengunjung dapat mencari dan membaca detail resep tanpa perlu masuk atau mendaftar.</p>
-      </details>
+        <details>
+          <summary>Apakah saya harus punya akun untuk melihat resep?</summary>
+          <p>Tidak. Semua pengunjung dapat mencari dan membaca detail resep tanpa perlu masuk atau mendaftar.</p>
+        </details>
 
-      <details>
-        <summary>Bagaimana cara mengatur takaran bahan sesuai jumlah porsi?</summary>
-        <p>Buka halaman <b>Detail Resep</b>, lalu tekan tombol <b>+</b> atau <b>−</b> di bagian Bahan-bahan. Takaran bahan akan dihitung ulang otomatis.</p>
-      </details>
+        <details>
+          <summary>Bagaimana cara mencari resep?</summary>
+          <p>Buka halaman <b>Resep</b>, lalu cari berdasarkan nama atau bahan. Anda juga dapat memilih kategori yang tersedia.</p>
+        </details>
 
-      <details>
-        <summary>Apa keuntungan mendaftar sebagai Member?</summary>
-        <p>Member dapat menyimpan resep favorit pribadi dan mengubah nama profil akun.</p>
-      </details>
+        <details>
+          <summary>Bagaimana cara mengatur takaran bahan sesuai jumlah porsi?</summary>
+          <p>Buka halaman <b>Detail Resep</b>, lalu tekan tombol <b>+</b> atau <b>−</b> di bagian Bahan-bahan. Takaran bahan akan dihitung ulang otomatis.</p>
+        </details>
+      </section>
+
+      <section class="faq-section" aria-labelledby="faq-member">
+        <h2 class="faq-section-title" id="faq-member">Untuk Member</h2>
+        <details>
+          <summary>Apa keuntungan mendaftar sebagai Member?</summary>
+          <p>Member dapat menyimpan resep favorit pribadi, mengubah nama profil akun, dan menulis ulasan pada resep.</p>
+        </details>
+
+        <details>
+          <summary>Bagaimana cara menyimpan resep favorit?</summary>
+          <p>Masuk ke akun, buka detail resep, lalu pilih tombol <b>Simpan ke Favorit</b>. Resep tersimpan dapat dilihat di halaman profil.</p>
+        </details>
+
+        <details>
+          <summary>Bagaimana cara mengubah nama profil?</summary>
+          <p>Buka halaman <b>Profil</b>, ubah nama pada kolom yang tersedia, lalu pilih <b>Simpan</b>.</p>
+        </details>
+
+        <details>
+          <summary>Bagaimana cara memberi atau menghapus ulasan?</summary>
+          <p>Masuk ke akun dan buka detail resep. Isi rating dan komentar untuk mengirim ulasan. Ulasan Anda dapat dihapus dari bagian ulasan pada resep tersebut.</p>
+        </details>
+      </section>
+
+      <section class="faq-section" aria-labelledby="faq-admin">
+        <h2 class="faq-section-title" id="faq-admin">Untuk Admin</h2>
+        <details>
+          <summary>Bagaimana cara menambah atau mengedit resep?</summary>
+          <p>Buka menu <b>Kelola Resep</b> pada halaman admin. Pilih <b>Tambah Resep</b> untuk membuat resep, atau <b>Edit</b> pada resep yang ingin diperbarui, lalu simpan perubahan.</p>
+        </details>
+
+        <details>
+          <summary>Bagaimana cara mengatur resep agar tampil atau menjadi draft?</summary>
+          <p>Pada menu <b>Kelola Resep</b>, gunakan tombol <b>Tayang</b> atau <b>Tarik</b> pada resep. Resep yang ditarik tidak ditampilkan kepada pengunjung.</p>
+        </details>
+
+        <details>
+          <summary>Di mana admin dapat mengelola pengguna?</summary>
+          <p>Buka menu <b>Kelola Pengguna</b> pada halaman admin untuk melihat atau menambahkan pengguna. Admin juga dapat menghapus akun yang diizinkan; akun admin dan akun yang sedang digunakan tidak dapat dihapus dari menu tersebut.</p>
+        </details>
+      </section>
 
       <div class="panel" style="margin-top:2rem;text-align:center">
         <h3>Masih punya pertanyaan?</h3>
@@ -46,5 +93,8 @@
 
   <footer id="foot"></footer>
   <script src="js/main.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/publik.js"></script>
+  <script src="js/navigasi.js"></script>
 </body>
 </html>
