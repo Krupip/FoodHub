@@ -366,7 +366,7 @@
       ? `<div class="acc"><button class="av" id="avb">${bersihkanTeks(penggunaAktif.name[0].toUpperCase())}</button><div class="dd" id="dd" hidden><div class="dn">${bersihkanTeks(penggunaAktif.name)}<small>${bersihkanTeks(penggunaAktif.email)}</small></div><a href="${akarFolder}profil.html">Profil</a>${penggunaAktif.role === 'admin' ? `<a href="${akarFolder}admin/dasbor.html">Admin</a>` : ''}<button id="lo">Keluar</button></div></div>`
       : `<a class="btn ghost sm" href="${akarFolder}masuk.html">Masuk</a><a class="btn sm" href="${akarFolder}daftar.html">Daftar</a>`;
 
-    pilihElemen('#nav').innerHTML = `<div class="container nb"><a class="logo" href="${akarFolder}index.html">FoodHub</a><nav class="nl">${tautanNavigasi}</nav><div class="na">${blokAkunUser}</div></div>`;
+    pilihElemen('#nav').innerHTML = `<div class="container nb"><a class="logo" href="${akarFolder}index.html"><img src="${akarFolder}img/logo-foodhub.png" alt="FoodHub"></a><nav class="nl">${tautanNavigasi}</nav><div class="na">${blokAkunUser}</div></div>`;
 
     pilihElemen('#avb')?.addEventListener('click', event => {
       event.stopPropagation();
@@ -385,7 +385,7 @@
   function bangunMenuAdmin() {
     const elemenHeaderAtas = pilihElemen('#top') || pilihElemen('#header-atas');
     if (elemenHeaderAtas) {
-      elemenHeaderAtas.innerHTML = `<div class="container nb"><strong>FoodHub Admin</strong><span class="muted sm">Halo, ${bersihkanTeks(penggunaAktif?.name || 'Admin')}</span></div>`;
+      elemenHeaderAtas.innerHTML = `<div class="container nb"><a class="logo" href="${akarFolder}index.html"><img src="${akarFolder}img/logo-foodhub.png" alt="FoodHub" style="height:32px;"></a><span class="muted sm">Halo, ${bersihkanTeks(penggunaAktif?.name || 'Admin')}</span></div>`;
     }
     const elemenMenuSamping = pilihElemen('#side') || pilihElemen('#menu-samping');
     if (elemenMenuSamping) {
