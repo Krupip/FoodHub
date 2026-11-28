@@ -16,26 +16,52 @@
   <main>
     <section class="hero">
       <div class="container">
-        <h1>Cari Resep Masakan</h1>
-        <p class="teks-redup">Temukan resep Nusantara lengkap dengan takaran bahan yang bisa disesuaikan per porsi.</p>
-        <form id="heroForm" class="searchbar" role="search">
-          <input id="q" type="search" placeholder="Cari nama resep atau bahan..." aria-label="Cari resep">
-          <button class="btn" type="submit">Cari</button>
+        <span class="tag" style="background:#facc15;cursor:default;margin-bottom:12px;">Platform resep makanan digital</span>
+        <h1 style="font-size:2.2rem;margin:0.5rem 0 0.8rem;line-height:1.2;">Masak apa hari ini?<br><span style="color:#dc2626;">Temukan di FoodHub.</span></h1>
+        <p class="muted" style="max-width:600px;margin:0 auto 1.5rem;">Cari resep dengan takaran jelas, atur jumlah porsi sesuai kebutuhan, dan simpan resep favoritmu.</p>
+        <form id="heroForm" class="searchbar" role="search" action="daftar-resep.html" method="GET" style="display:flex;gap:0.6rem;max-width:540px;margin:0 auto 1.2rem;">
+          <input id="q" name="q" type="search" placeholder="Cari resep, bahan, atau masakan..." aria-label="Cari resep">
+          <button class="btn" type="submit" style="white-space:nowrap;">Cari</button>
         </form>
-        <div class="chips" id="cats"></div>
+        <div class="chips" style="justify-content:center;">
+          <a class="chip on" href="daftar-resep.html">Semua</a>
+          <a class="chip" href="daftar-resep.html?kategori=Makanan+Berat">Makanan Berat</a>
+          <a class="chip" href="daftar-resep.html?kategori=Sehat">Sehat</a>
+          <a class="chip" href="daftar-resep.html?kategori=Kue">Kue</a>
+          <a class="chip" href="daftar-resep.html?kategori=Minuman">Minuman</a>
+          <a class="chip" href="daftar-resep.html?kategori=Cepat">Cepat</a>
+          <a class="chip" href="daftar-resep.html?kategori=Anak+Kos">Anak Kos</a>
+        </div>
       </div>
     </section>
 
     <section class="container">
-      <div class="sec-h">
-        <h2>Resep Pilihan</h2>
+      <div class="kepala-bagian" style="margin-bottom:1.2rem;">
+        <h2 style="margin:0;">Resep populer minggu ini</h2>
         <a href="daftar-resep.html">Lihat semua &rarr;</a>
       </div>
       <div class="grid" id="pop"></div>
+
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-top:2.5rem;">
+        <div class="panel" style="background:#dc2626;color:#ffffff;box-shadow:4px 4px 0 #1c1917;">
+          <h3 style="margin-top:0;">Jelajahi semua resep</h3>
+          <p style="margin:0.5rem 0 1.2rem;opacity:0.9;">Filter berdasarkan kategori, waktu memasak, dan tingkat kesulitan.</p>
+          <a class="btn" style="background:#1c1917;color:#fff;border-color:#1c1917;" href="daftar-resep.html">Lihat Daftar Resep</a>
+        </div>
+        <div class="panel" style="background:#facc15;color:#1c1917;box-shadow:4px 4px 0 #1c1917;">
+          <h3 style="margin-top:0;">Punya pertanyaan?</h3>
+          <p style="margin:0.5rem 0 1.2rem;color:#44403c;">Temukan jawaban seputar penggunaan dan fitur FoodHub.</p>
+          <a class="btn" style="background:#1c1917;color:#fff;border-color:#1c1917;" href="faq.html">Buka FAQ</a>
+        </div>
+      </div>
     </section>
   </main>
 
-  <footer id="foot"></footer>
+  <footer id="foot">
+    <div class="container" style="padding:1rem 0;">
+      <p style="margin:0;">&copy; 2026 <strong>FoodHub</strong> &bull; Platform Resep Makanan Digital Nusantara.</p>
+    </div>
+  </footer>
   <script src="js/main.js"></script>
 </body>
 </html>

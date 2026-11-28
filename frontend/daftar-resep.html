@@ -14,49 +14,40 @@
   <header id="nav"></header>
 
   <main>
-    <div class="container">
-      <div class="ph">
-        <h1>Semua Resep</h1>
-        <p>Cari berdasarkan nama, bahan, kategori, waktu memasak, atau tingkat kesulitan.</p>
+    <div class="container" style="margin-top:1.5rem;">
+      <div class="panel" style="margin-bottom:1.5rem;">
+        <h1 style="margin:0 0 0.4rem;">Semua Resep</h1>
+        <p class="muted" style="margin:0;">Cari berdasarkan nama, bahan, kategori, waktu memasak, atau tingkat kesulitan.</p>
       </div>
 
-      <div class="filters">
-        <div class="fld grow">
-          <label for="fq">Cari</label>
-          <input id="fq" type="search" placeholder="Nama resep atau bahan">
+      <div class="filters" style="margin-bottom:1.5rem;">
+        <div style="flex:2;min-width:240px;">
+          <label class="sm" for="fq"><b>Cari Resep</b></label>
+          <input id="fq" type="search" placeholder="Nama resep atau bahan..." style="margin-top:0.3rem;">
         </div>
-        <div class="fld">
-          <label for="fk">Kategori</label>
-          <select id="fk"></select>
-        </div>
-        <div class="fld">
-          <label for="fw">Waktu memasak</label>
-          <select id="fw">
-            <option value="0">Semua waktu</option>
-            <option value="15">Maks. 15 menit</option>
-            <option value="30">Maks. 30 menit</option>
-            <option value="60">Maks. 60 menit</option>
-            <option value="999">Lebih dari 60 menit</option>
+        <div style="flex:1;min-width:180px;">
+          <label class="sm" for="fk"><b>Kategori</b></label>
+          <select id="fk" style="margin-top:0.3rem;">
+            <option value="">Semua Kategori</option>
+            <option value="Makanan Berat">Makanan Berat</option>
+            <option value="Sehat">Sehat</option>
+            <option value="Kue">Kue</option>
+            <option value="Minuman">Minuman</option>
+            <option value="Cepat">Cepat</option>
+            <option value="Anak Kos">Anak Kos</option>
           </select>
         </div>
-        <div class="fld">
-          <label for="fl">Tingkat</label>
-          <select id="fl">
-            <option value="">Semua tingkat</option>
-            <option>Mudah</option>
-            <option>Sedang</option>
-            <option>Sulit</option>
-          </select>
-        </div>
-        <button class="btn ghost" id="fr" type="button">Atur ulang</button>
       </div>
 
-      <p id="cnt" class="teks-redup kecil" aria-live="polite"></p>
       <div class="grid" id="rl"></div>
     </div>
   </main>
 
-  <footer id="foot"></footer>
+  <footer id="foot">
+    <div class="container" style="padding:1rem 0;">
+      <p style="margin:0 0 0.4rem;">&copy; 2026 <strong>FoodHub</strong> &bull; Platform Resep Makanan Digital Nusantara.</p>
+    </div>
+  </footer>
   <script src="js/main.js"></script>
 </body>
 </html>

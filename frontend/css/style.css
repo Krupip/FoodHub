@@ -1,194 +1,60 @@
-/* ==========================================================================
-   CSS FoodHub - Terinspirasi dari Mockup Figma (Modern Sederhana)
-   ========================================================================== */
-
+/* FoodHub - style.css (Desain Figma Modern Sederhana, Format Petani Kode) */
 * { box-sizing: border-box; }
-
-body {
-  margin: 0;
-  font: 16px/1.6 system-ui, sans-serif;
-  background: #fdf8f2; /* Latar krem hangat */
-  color: #1c1917;      /* Teks hitam espresso */
-}
-
+body { margin: 0; font: 16px/1.6 system-ui, -apple-system, sans-serif; background: #fdf8f2; color: #1c1917; }
 img { max-width: 100%; display: block; }
 a { color: #dc2626; text-decoration: none; font-weight: 600; }
 a:hover { text-decoration: underline; }
 [hidden] { display: none !important; }
-
-.container, .admin-konten {
-  width: min(1040px, 92%);
-  margin: 0 auto;
+.container, .adm-c, .admin-konten { width: min(1040px, 92%); margin: auto; }
+.narrow { max-width: 780px; }
+.muted, .sm, .teks-redup, .kecil { color: #57534e; font-size: 0.88rem; }
+.btn, .tombol {
+  display: inline-block; padding: 0.45rem 1rem; border-radius: 99px; border: 2px solid #1c1917;
+  background: #dc2626; color: #ffffff; font-weight: 600; cursor: pointer; text-decoration: none; box-shadow: 2px 2px 0 #1c1917;
 }
-
-.teks-redup, .kecil {
-  color: #57534e;
-  font-size: 0.88rem;
+.btn:hover, .tombol:hover { background: #b91c1c; }
+.btn.ghost, .tombol.ghost { background: #ffffff; color: #1c1917; }
+.btn.danger { background: #fee2e2; color: #dc2626; border-color: #dc2626; }
+.btn.sm, .tombol.kecil { padding: 0.35rem 0.85rem; font-size: 0.85rem; }
+#nav, #top, #side, #foot { background: #ffffff; border-bottom: 2px solid #1c1917; padding: 0.8rem 0; }
+.hero { background: #fef3c7; border-bottom: 2px solid #1c1917; padding: 2.5rem 0; margin-bottom: 1.8rem; text-align: center; }
+.nb, .fb, .sec-h, .nl, .na, .chips, .filters, .detail-info, #top, #side, .kepala-bagian {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.8rem; justify-content: space-between;
 }
-
-/* Header & Navigasi */
-#navigasi, #nav, #header-atas, #menu-samping {
-  background: #ffffff;
-  border-bottom: 2px solid #1c1917;
-  padding: 0.8rem 0;
+.logo, .card { display: flex; text-decoration: none; color: inherit; }
+.logo { align-items: center; gap: 0.7rem; font-weight: 900; font-size: 1.45rem; letter-spacing: -0.03em; color: #1c1917; }
+.logo img, .t-thumb { width: 40px; height: 40px; border-radius: 8px; border: 2px solid #1c1917; object-fit: cover; }
+.thumb { width: 100%; height: 160px; border-bottom: 2px solid #1c1917; overflow: hidden; background: #e7e5e4; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; }
+.nl a, #side a, #side button, .dd a, .dd button {
+  padding: 0.35rem 0.8rem; border-radius: 8px; text-decoration: none; color: #1c1917; font-weight: 600; background: none; border: 0; cursor: pointer;
 }
-
-.nav-wrap {
-  width: min(1040px, 92%);
-  margin: auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-}
-
-.brand img {
-  width: auto;
-  height: 40px;
-  border-radius: 8px;
-  border: 2px solid #1c1917;
-  object-fit: contain;
-}
-
-.nav-links {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 1rem;
-}
-
-.nav-links a {
-  text-decoration: none;
-  color: #1c1917;
-  font-weight: 600;
-}
-
-.nav-links a:hover {
-  color: #dc2626;
-}
-
-/* Tombol */
-.tombol, .btn {
-  display: inline-block;
-  padding: 0.45rem 1rem;
-  border-radius: 99px;
-  border: 2px solid #1c1917;
-  background: #dc2626;
-  color: #ffffff;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: none;
-  box-shadow: 2px 2px 0 #1c1917;
-}
-
-.tombol:hover, .btn:hover {
-  background: #b91c1c;
-}
-
-.tombol.ghost, .btn.ghost {
-  background: #ffffff;
-  color: #1c1917;
-}
-
-.tombol.kecil, .btn.sm {
-  padding: 0.35rem 0.85rem;
-  font-size: 0.85rem;
-}
-
-/* Bagian Hero / Pencarian */
-.hero {
-  background: #fef3c7; /* Kuning hangat lembut */
-  border-bottom: 2px solid #1c1917;
-  padding: 2.5rem 0;
-  margin-bottom: 1.8rem;
-  text-align: center;
-}
-
-.searchbar {
-  display: flex;
-  gap: 0.6rem;
-  max-width: 520px;
-  margin: 1rem auto;
-}
-
-.searchbar input, input, select, textarea {
-  width: 100%;
-  padding: 0.55rem 0.9rem;
-  border: 2px solid #1c1917;
-  border-radius: 10px;
-  background: #ffffff;
-  font: inherit;
-}
-
-/* Grid & Kartu Resep */
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 1.2rem;
-  margin-top: 1rem;
-}
-
+.nl a:hover, #side a:hover, .dd a:hover { color: #dc2626; }
+.nl a.on, #side a.on, .chip.on { background: #1c1917; color: #ffffff; }
+.grid, .fld-row, .stat { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1.2rem; }
 .card {
-  display: flex;
-  flex-direction: column;
-  background: #ffffff;
-  border: 2px solid #1c1917;
-  border-radius: 12px;
-  overflow: hidden;
-  text-decoration: none;
-  color: inherit;
-  box-shadow: 4px 4px 0 #1c1917;
+  flex-direction: column; background: #ffffff; border: 2px solid #1c1917; border-radius: 12px; overflow: hidden; box-shadow: 4px 4px 0 #1c1917;
 }
-
-.card:hover {
-  transform: translate(-2px, -2px);
-  box-shadow: 6px 6px 0 #1c1917;
+.card:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 #1c1917; }
+.card > div:last-child { padding: 0.85rem; }
+.card h3 { margin: 0 0 0.35rem; font-size: 1.05rem; }
+.card .meta { display: flex; gap: 0.7rem; color: #57534e; font-size: 0.85rem; }
+.tag, .chip, .badge-daerah {
+  display: inline-block; padding: 0.2rem 0.65rem; border-radius: 99px; font-size: 0.78rem; font-weight: 600;
+  border: 1.5px solid #1c1917; background: #facc15; color: #1c1917;
 }
-
-.card img {
-  width: 100%;
-  height: 165px;
-  object-fit: cover;
-  border-bottom: 2px solid #1c1917;
+.chip { background: #ffffff; cursor: pointer; padding: 0.35rem 0.85rem; }
+.panel, .formbox, .tw, .faq details, .filters {
+  background: #ffffff; border: 2px solid #1c1917; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.2rem; box-shadow: 4px 4px 0 #1c1917;
 }
-
-.card-body {
-  padding: 0.9rem;
+input, select, textarea {
+  width: 100%; padding: 0.55rem 0.9rem; border: 2px solid #1c1917; border-radius: 10px; background: #ffffff; font: inherit;
 }
-
-.card-body h3 {
-  margin: 0 0 0.3rem;
-  font-size: 1.05rem;
-}
-
-/* Panel, Form, & Tabel */
-.panel, .formbox {
-  background: #ffffff;
-  border: 2px solid #1c1917;
-  border-radius: 12px;
-  padding: 1.25rem;
-  margin-bottom: 1.2rem;
-  box-shadow: 4px 4px 0 #1c1917;
-}
-
-.auth { max-width: 440px; margin: 2.5rem auto; }
-.kolom-input { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 0.9rem; }
-.centang { flex-direction: row; align-items: center; gap: 0.5rem; }
-.kotak-error { background: #fee2e2; color: #dc2626; border: 2px solid #dc2626; padding: 0.7rem; border-radius: 8px; margin-bottom: 0.9rem; }
-.kepala-bagian { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.6rem; margin-bottom: 1rem; }
-.kotak-statistik { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.9rem; margin-bottom: 1.2rem; }
-.baris { display: flex; justify-content: space-between; align-items: center; background: #ffffff; border: 2px solid #1c1917; padding: 0.9rem 1rem; border-radius: 10px; margin-bottom: 0.7rem; }
-.wadah-tabel { background: #ffffff; border: 2px solid #1c1917; border-radius: 10px; overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; }
-th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #e7e5e4; }
+th, td { text-align: left; padding: 0.75rem 1rem; border-bottom: 1px solid #e7e5e4; }
 th { background: #fef3c7; border-bottom: 2px solid #1c1917; }
-
-/* Footer Gelap Espresso */
-#kaki-halaman, #foot {
-  background: #1c1917;
-  color: #f5f5f4;
-  text-align: center;
-  padding: 1.5rem 0;
-  margin-top: 3rem;
-  font-size: 0.9rem;
-}
+.err, .kotak-error { padding: 0.7rem; border-radius: 8px; background: #fee2e2; color: #dc2626; border: 2px solid #dc2626; margin-bottom: 0.8rem; }
+.ok { padding: 0.7rem; border-radius: 8px; background: #f0fdf4; color: #15803d; border: 2px solid #15803d; margin-bottom: 0.8rem; }
+#toast { position: fixed; bottom: 20px; right: 20px; background: #1c1917; color: #fff; padding: 0.8rem 1.4rem; border-radius: 8px; display: none; z-index: 99; }
+#toast.show { display: block; }
+#foot { background: #1c1917; color: #f5f5f4; text-align: center; margin-top: 3rem; }

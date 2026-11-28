@@ -11,39 +11,39 @@
 </head>
 <!-- Bagian badan: semua konten yang tampil di browser -->
 <body data-page="daftar" data-root="" data-access="">
-  <header id="navigasi"></header>
+  <header id="nav"></header>
 
   <main>
     <div class="container auth">
-      <form class="formbox" id="form-daftar" novalidate>
+      <form class="formbox" id="df" novalidate>
         <h1>Buat Akun FoodHub</h1>
-        <div class="kotak-error" id="pesan-error" hidden></div>
+        <div class="err" id="er" hidden></div>
 
         <div class="kolom-input">
-          <label for="daftar-nama">Nama</label>
-          <input id="daftar-nama" autocomplete="name" maxlength="40">
+          <label for="dn">Nama</label>
+          <input id="dn" autocomplete="name" maxlength="40">
         </div>
 
         <div class="kolom-input">
-          <label for="daftar-email">Email</label>
-          <input id="daftar-email" type="email" autocomplete="email">
+          <label for="de">Email</label>
+          <input id="de" type="email" autocomplete="email">
         </div>
 
         <div class="kolom-input">
-          <label for="daftar-sandi">Kata sandi (min. 8 karakter)</label>
-          <input id="daftar-sandi" type="password" autocomplete="new-password">
+          <label for="dp">Kata sandi (min. 8 karakter)</label>
+          <input id="dp" type="password" autocomplete="new-password">
         </div>
 
         <div class="kolom-input">
-          <label for="daftar-konfirmasi-sandi">Ulangi kata sandi</label>
-          <input id="daftar-konfirmasi-sandi" type="password" autocomplete="new-password">
+          <label for="dk">Ulangi kata sandi</label>
+          <input id="dk" type="password" autocomplete="new-password">
         </div>
 
-        <label class="centang kolom-input">
-          <input type="checkbox" id="daftar-setuju"> Saya setuju dengan syarat penggunaan FoodHub
+        <label class="centang kolom-input" style="flex-direction:row;align-items:center;gap:0.5rem;display:flex;">
+          <input type="checkbox" id="ds" style="width:auto;"> Saya setuju dengan syarat penggunaan FoodHub
         </label>
 
-        <button class="tombol" type="submit" style="width:100%">Daftar</button>
+        <button class="btn" type="submit" style="width:100%">Daftar</button>
 
         <p class="kecil" style="margin-top:1rem;text-align:center">
           Sudah punya akun? <a href="masuk.html"><b>Masuk</b></a>
@@ -52,7 +52,7 @@
     </div>
   </main>
 
-  <footer id="kaki-halaman"></footer>
+  <footer id="foot"></footer>
   <script src="js/main.js"></script>
 </body>
 </html>
