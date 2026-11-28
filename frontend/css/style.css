@@ -5,20 +5,31 @@ img { max-width: 100%; display: block; }
 a { color: #dc2626; text-decoration: none; font-weight: 600; }
 a:hover { text-decoration: underline; }
 [hidden] { display: none !important; }
+
+/* Wadah & Pembatas Lebar */
 .container, .adm-c, .admin-konten { width: min(1040px, 92%); margin: auto; }
+.auth { max-width: 460px; margin: 3rem auto; padding: 0 1rem; }
 .narrow { max-width: 780px; }
 .muted, .sm, .teks-redup, .kecil { color: #57534e; font-size: 0.88rem; }
+
+/* Tombol Desain Figma */
 .btn, .tombol {
-  display: inline-block; padding: 0.45rem 1rem; border-radius: 99px; border: 2px solid #1c1917;
-  background: #dc2626; color: #ffffff; font-weight: 600; cursor: pointer; text-decoration: none; box-shadow: 2px 2px 0 #1c1917;
+  display: inline-block; padding: 0.55rem 1.25rem; border-radius: 99px; border: 2px solid #1c1917;
+  background: #dc2626; color: #ffffff; font-weight: 700; cursor: pointer; text-decoration: none;
+  box-shadow: 2px 2px 0 #1c1917; transition: transform 0.1s, box-shadow 0.1s; text-align: center;
 }
-.btn:hover, .tombol:hover { background: #b91c1c; }
+.btn:hover, .tombol:hover { background: #b91c1c; transform: translate(-1px, -1px); box-shadow: 3px 3px 0 #1c1917; }
+.btn:active, .tombol:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 #1c1917; }
 .btn.ghost, .tombol.ghost { background: #ffffff; color: #1c1917; }
 .btn.danger { background: #fee2e2; color: #dc2626; border-color: #dc2626; }
 .btn.sm, .tombol.kecil { padding: 0.35rem 0.85rem; font-size: 0.85rem; }
-#nav, #top, #side, #foot { background: #ffffff; border-bottom: 2px solid #1c1917; padding: 0.8rem 0; }
+
+/* Navigasi & Header */
+#nav, #top, #side, #header-atas, #menu-samping { background: #ffffff; border-bottom: 2px solid #1c1917; padding: 0.8rem 0; }
+#top, #header-atas { font-size: 1.1rem; }
+#side, #menu-samping { display: flex; flex-wrap: wrap; gap: 0.6rem; padding: 0.6rem 0; margin-bottom: 1.5rem; }
 .hero { background: #fef3c7; border-bottom: 2px solid #1c1917; padding: 2.5rem 0; margin-bottom: 1.8rem; text-align: center; }
-.nb, .fb, .sec-h, .nl, .na, .chips, .filters, .detail-info, #top, #side, .kepala-bagian {
+.nb, .fb, .sec-h, .nl, .na, .chips, .filters, .detail-info, #top, .kepala-bagian {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.8rem; justify-content: space-between;
 }
 .logo, .card { display: flex; text-decoration: none; color: inherit; }
@@ -26,12 +37,14 @@ a:hover { text-decoration: underline; }
 .logo img, .t-thumb { width: 40px; height: 40px; border-radius: 8px; border: 2px solid #1c1917; object-fit: cover; }
 .thumb { width: 100%; height: 160px; border-bottom: 2px solid #1c1917; overflow: hidden; background: #e7e5e4; }
 .thumb img { width: 100%; height: 100%; object-fit: cover; }
-.nl a, #side a, #side button, .dd a, .dd button {
-  padding: 0.35rem 0.8rem; border-radius: 8px; text-decoration: none; color: #1c1917; font-weight: 600; background: none; border: 0; cursor: pointer;
+.nl a, #side a, #side button, #menu-samping a, #menu-samping button, .dd a, .dd button {
+  padding: 0.4rem 0.9rem; border-radius: 8px; text-decoration: none; color: #1c1917; font-weight: 600; background: none; border: 0; cursor: pointer;
 }
-.nl a:hover, #side a:hover, .dd a:hover { color: #dc2626; }
-.nl a.on, #side a.on, .chip.on { background: #1c1917; color: #ffffff; }
-.grid, .fld-row, .stat { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1.2rem; }
+.nl a:hover, #side a:hover, #menu-samping a:hover, .dd a:hover { color: #dc2626; }
+.nl a.on, #side a.on, #menu-samping a.on, .chip.on { background: #1c1917; color: #ffffff; }
+
+/* Grid & Kartu Resep */
+.grid, .fld-row, .stat, .kotak-statistik { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1.2rem; }
 .card {
   flex-direction: column; background: #ffffff; border: 2px solid #1c1917; border-radius: 12px; overflow: hidden; box-shadow: 4px 4px 0 #1c1917;
 }
@@ -39,22 +52,51 @@ a:hover { text-decoration: underline; }
 .card > div:last-child { padding: 0.85rem; }
 .card h3 { margin: 0 0 0.35rem; font-size: 1.05rem; }
 .card .meta { display: flex; gap: 0.7rem; color: #57534e; font-size: 0.85rem; }
-.tag, .chip, .badge-daerah {
+
+/* Tag & Chip */
+.tag, .chip, .badge-daerah, .sts {
   display: inline-block; padding: 0.2rem 0.65rem; border-radius: 99px; font-size: 0.78rem; font-weight: 600;
   border: 1.5px solid #1c1917; background: #facc15; color: #1c1917;
 }
 .chip { background: #ffffff; cursor: pointer; padding: 0.35rem 0.85rem; }
-.panel, .formbox, .tw, .faq details, .filters {
-  background: #ffffff; border: 2px solid #1c1917; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.2rem; box-shadow: 4px 4px 0 #1c1917;
+.sts.tayang, .sts.disetujui { background: #dcfce7; color: #166534; border-color: #166534; }
+.sts.sembunyi, .sts.ditolak { background: #fee2e2; color: #991b1b; border-color: #991b1b; }
+.sts.admin { background: #e0e7ff; color: #3730a3; border-color: #3730a3; }
+
+/* Panel & Formbox ala Figma */
+.panel, .formbox, .tw, .wadah-tabel, .faq details, .filters {
+  background: #ffffff; border: 2px solid #1c1917; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 4px 4px 0 #1c1917;
 }
+.formbox h1 { margin-top: 0; font-size: 1.6rem; text-align: center; }
+
+/* Elemen Form Input */
+.fld, .kolom-input { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 1.1rem; }
+.fld label, .kolom-input label { font-weight: 600; font-size: 0.92rem; color: #1c1917; }
 input, select, textarea {
-  width: 100%; padding: 0.55rem 0.9rem; border: 2px solid #1c1917; border-radius: 10px; background: #ffffff; font: inherit;
+  width: 100%; padding: 0.65rem 0.9rem; border: 2px solid #1c1917; border-radius: 8px; background: #ffffff; font: inherit; color: #1c1917;
 }
+input:focus, select:focus, textarea:focus { outline: none; border-color: #dc2626; box-shadow: 0 0 0 2px #fecaca; }
+
+/* Baris & Checkbox */
+.chk, .centang { display: flex !important; flex-direction: row !important; align-items: center; gap: 0.6rem; cursor: pointer; font-size: 0.9rem; }
+.chk input, .centang input { width: auto; margin: 0; }
+.row, .baris {
+  display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.25rem;
+  background: #ffffff; border: 2px solid #1c1917; border-radius: 10px; margin-bottom: 0.8rem; box-shadow: 3px 3px 0 #1c1917;
+}
+.stat .panel, .kotak-statistik .panel { text-align: center; padding: 1.25rem; }
+.stat b, .kotak-statistik b { display: block; font-size: 2.2rem; line-height: 1.1; margin-bottom: 0.3rem; color: #dc2626; }
+
+/* Tabel Admin */
+.tw, .wadah-tabel { overflow-x: auto; padding: 0; }
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: 0.75rem 1rem; border-bottom: 1px solid #e7e5e4; }
-th { background: #fef3c7; border-bottom: 2px solid #1c1917; }
-.err, .kotak-error { padding: 0.7rem; border-radius: 8px; background: #fee2e2; color: #dc2626; border: 2px solid #dc2626; margin-bottom: 0.8rem; }
-.ok { padding: 0.7rem; border-radius: 8px; background: #f0fdf4; color: #15803d; border: 2px solid #15803d; margin-bottom: 0.8rem; }
-#toast { position: fixed; bottom: 20px; right: 20px; background: #1c1917; color: #fff; padding: 0.8rem 1.4rem; border-radius: 8px; display: none; z-index: 99; }
+th { background: #fef3c7; border-bottom: 2px solid #1c1917; font-weight: 700; }
+tbody tr:hover { background: #fafaf9; }
+
+/* Pesan & Toast */
+.err, .kotak-error { padding: 0.75rem 1rem; border-radius: 8px; background: #fee2e2; color: #dc2626; border: 2px solid #dc2626; margin-bottom: 1rem; font-size: 0.9rem; }
+.ok { padding: 0.75rem 1rem; border-radius: 8px; background: #f0fdf4; color: #15803d; border: 2px solid #15803d; margin-bottom: 1rem; font-size: 0.9rem; }
+#toast { position: fixed; bottom: 20px; right: 20px; background: #1c1917; color: #fff; padding: 0.8rem 1.4rem; border-radius: 8px; display: none; z-index: 99; box-shadow: 4px 4px 0 #57534e; }
 #toast.show { display: block; }
 #foot { background: #1c1917; color: #f5f5f4; text-align: center; margin-top: 3rem; }

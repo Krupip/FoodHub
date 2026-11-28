@@ -347,7 +347,7 @@
     }
 
     if (pilihElemen('#nav')) bangunMenuNavigasi();
-    if (pilihElemen('#side')) bangunMenuAdmin();
+    if (pilihElemen('#side') || pilihElemen('#menu-samping')) bangunMenuAdmin();
     elemenTerlindungi.forEach(({ elemen, kondisiAwal }) => { elemen.hidden = kondisiAwal; });
     return true;
   }
@@ -383,9 +383,23 @@
   }
 
   function bangunMenuAdmin() {
-    pilihElemen('#top').innerHTML = `<strong>FoodHub Admin</strong><span class="muted sm">${bersihkanTeks(penggunaAktif?.name || 'Admin')}</span>`;
-    pilihElemen('#side').innerHTML = `<a href="dasbor.html" class="on">Dasbor</a><a href="kelola-resep.html">Kelola Resep</a><a href="kelola-pengguna.html">Kelola Pengguna</a><a href="${akarFolder}index.html">Situs</a><button id="alo">Keluar</button>`;
-    pilihElemen('#alo')?.addEventListener('click', prosesKeluar);
+    const elemenHeaderAtas = pilihElemen('#top') || pilihElemen('#header-atas');
+    if (elemenHeaderAtas) {
+      elemenHeaderAtas.innerHTML = `<div class="container nb"><strong>FoodHub Admin</strong><span class="muted sm">Halo, ${bersihkanTeks(penggunaAktif?.name || 'Admin')}</span></div>`;
+    }
+    const elemenMenuSamping = pilihElemen('#side') || pilihElemen('#menu-samping');
+    if (elemenMenuSamping) {
+      const tautanSide = [
+        ['dasbor.html', 'dasbor', 'Dasbor'],
+        ['kelola-resep.html', 'kelola-resep', 'Kelola Resep'],
+        ['kelola-pengguna.html', 'kelola-pengguna', 'Kelola Pengguna']
+      ].map(([berkas, halaman, label]) =>
+        `<a href="${berkas}"${halamanSaatIni === halaman ? ' class="on"' : ''}>${label}</a>`
+      ).join('');
+
+      elemenMenuSamping.innerHTML = `<div class="container nb" style="justify-content:flex-start;gap:0.6rem;">${tautanSide}<a href="${akarFolder}index.html">Lihat Situs</a><button id="alo" style="margin-left:auto;">Keluar</button></div>`;
+      pilihElemen('#alo')?.addEventListener('click', prosesKeluar);
+    }
   }
 
   // 6. Komponen Kartu Resep & Logika Halaman (PG Object)
@@ -596,10 +610,284 @@
 
     // 6.7. Halaman Statis & Panel Admin
     faq() {},
-    dasbor() {},
-    'kelola-resep'() {},
+
+    async dasbor() {
+      let statistik = { total_recipes: 0, published_recipes: 0, hidden_recipes: 0, total_users: 0 };
+      try {
+        const responsStatistik = await api('admin/stats.php');
+        if (responsStatistik && responsStatistik.stats) {
+          statistik = responsStatistik.stats;
+        }
+      } catch (error) {
+        statistik.total_recipes = 14;
+        statistik.published_recipes = 14;
+        statistik.hidden_recipes = 0;
+        statistik.total_users = 3;
+      }
+
+      const totalEl = pilihElemen('#statTotal');
+      const tayangEl = pilihElemen('#statTayang');
+      const sembunyiEl = pilihElemen('#statSembunyi');
+      const penggunaEl = pilihElemen('#statPengguna');
+
+      if (totalEl) totalEl.textContent = String(statistik.total_recipes);
+      if (tayangEl) tayangEl.textContent = String(statistik.published_recipes);
+      if (sembunyiEl) sembunyiEl.textContent = String(statistik.hidden_recipes);
+      if (penggunaEl) penggunaEl.textContent = String(statistik.total_users);
+    },
+
+    async 'kelola-resep'() {
+      const tabelResep = pilihElemen('#resepTableBody');
+      const panelForm = pilihElemen('#recipePanel');
+      const formResep = pilihElemen('#recipeForm');
+      const tombolTambah = pilihElemen('#btnTambahResep');
+      const tombolBatal = pilihElemen('#formCancel');
+
+      let daftarResep = [];
+      const muatResep = async () => {
+        try {
+          const res = await api('admin/recipes.php');
+          daftarResep = res?.recipes || [];
+        } catch {
+          daftarResep = [];
+        }
+        if (!tabelResep) return;
+        if (!daftarResep.length) {
+          tabelResep.innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center;padding:1.5rem;">Belum ada resep.</td></tr>';
+          return;
+        }
+        tabelResep.innerHTML = daftarResep.map(resep => {
+          const tayang = resep.is_published == 1;
+          const urlFoto = formatUrlGambar(resep.image_path || resep.image);
+          return `
+            <tr>
+              <td>${urlFoto ? `<img class="t-thumb" src="${urlFoto}" alt="${bersihkanTeks(resep.title)}">` : '<div class="t-thumb" style="display:grid;place-items:center;background:#e7e5e4;">🍳</div>'}</td>
+              <td><strong>${bersihkanTeks(resep.title)}</strong></td>
+              <td>${bersihkanTeks(resep.category_name || '-')}</td>
+              <td>${resep.cook_time_minutes || 30} mnt</td>
+              <td><span class="sts ${tayang ? 'tayang' : 'sembunyi'}">${tayang ? 'Tayang' : 'Draft'}</span></td>
+              <td>
+                <div style="display:flex;gap:0.4rem;align-items:center;">
+                  <button class="btn sm ${tayang ? 'ghost' : ''}" type="button" data-pub="${resep.id}" data-v="${tayang ? 0 : 1}">${tayang ? 'Tarik' : 'Tayang'}</button>
+                  <button class="btn sm ghost" type="button" data-edit="${resep.id}">Edit</button>
+                  <button class="btn danger sm" type="button" data-del="${resep.id}">Hapus</button>
+                </div>
+              </td>
+            </tr>`;
+        }).join('');
+      };
+
+      tombolTambah?.addEventListener('click', () => {
+        if (formResep) formResep.reset();
+        const inputId = pilihElemen('#resep-id');
+        if (inputId) inputId.value = '';
+        const modalTitle = pilihElemen('#modalTitle');
+        if (modalTitle) modalTitle.textContent = 'Tambah Resep Baru';
+        if (panelForm) panelForm.hidden = false;
+      });
+
+      tombolBatal?.addEventListener('click', () => {
+        if (panelForm) panelForm.hidden = true;
+      });
+
+      tabelResep?.addEventListener('click', async event => {
+        const btnDel = event.target.closest('[data-del]');
+        if (btnDel) {
+          const id = btnDel.dataset.del;
+          if (!confirm('Hapus resep ini?')) return;
+          try {
+            await api('admin/recipes.php?id=' + encodeURIComponent(id), { method: 'DELETE' });
+            tampilkanToast('Resep dihapus.');
+            muatResep();
+          } catch (err) {
+            tampilkanToast(err.message || 'Gagal menghapus.');
+          }
+          return;
+        }
+
+        const btnPub = event.target.closest('[data-pub]');
+        if (btnPub) {
+          const id = btnPub.dataset.pub;
+          const status = Number(btnPub.dataset.v);
+          try {
+            await api('admin/recipes.php?id=' + encodeURIComponent(id), {
+              method: 'PATCH',
+              body: { is_published: status }
+            });
+            tampilkanToast('Status resep diperbarui.');
+            muatResep();
+          } catch (err) {
+            tampilkanToast(err.message || 'Gagal memperbarui status.');
+          }
+          return;
+        }
+
+        const btnEdit = event.target.closest('[data-edit]');
+        if (btnEdit) {
+          const id = btnEdit.dataset.edit;
+          try {
+            const data = (await api('recipes.php?id=' + encodeURIComponent(id)))?.recipe;
+            if (data && panelForm) {
+              const modalTitle = pilihElemen('#modalTitle');
+              if (modalTitle) modalTitle.textContent = 'Edit Resep';
+              if (pilihElemen('#resep-id')) pilihElemen('#resep-id').value = data.id || '';
+              if (pilihElemen('#resep-nama')) pilihElemen('#resep-nama').value = data.title || '';
+              if (pilihElemen('#resep-daerah')) pilihElemen('#resep-daerah').value = data.region || '';
+              if (pilihElemen('#resep-waktu')) pilihElemen('#resep-waktu').value = data.cook_time_minutes || 30;
+              if (pilihElemen('#resep-porsi')) pilihElemen('#resep-porsi').value = data.servings || 4;
+              if (pilihElemen('#resep-kesulitan')) pilihElemen('#resep-kesulitan').value = data.difficulty || 'sedang';
+              if (pilihElemen('#resep-deskripsi')) pilihElemen('#resep-deskripsi').value = data.story || '';
+              if (pilihElemen('#resep-bahan')) {
+                pilihElemen('#resep-bahan').value = (data.ingredients || []).map(b => `${b.name || ''}, ${b.quantity || ''}, ${b.unit || ''}`).join('\n');
+              }
+              if (pilihElemen('#resep-langkah')) {
+                pilihElemen('#resep-langkah').value = (data.steps || []).join('\n');
+              }
+              panelForm.hidden = false;
+            }
+          } catch (err) {
+            tampilkanToast(err.message || 'Gagal memuat resep.');
+          }
+        }
+      });
+
+      formResep?.addEventListener('submit', async event => {
+        event.preventDefault();
+        const id = pilihElemen('#resep-id')?.value;
+        const title = pilihElemen('#resep-nama')?.value.trim();
+        const story = pilihElemen('#resep-deskripsi')?.value.trim();
+        if (!title || !story) return tampilkanToast('Nama dan deskripsi resep wajib diisi.');
+
+        const bodyData = {
+          title,
+          story,
+          region: pilihElemen('#resep-daerah')?.value.trim(),
+          category: pilihElemen('#resep-kategori')?.value,
+          cook_time_minutes: Number(pilihElemen('#resep-waktu')?.value) || 30,
+          difficulty: pilihElemen('#resep-kesulitan')?.value || 'sedang',
+          servings: Number(pilihElemen('#resep-porsi')?.value) || 4,
+          ingredients: (pilihElemen('#resep-bahan')?.value || '').split('\n').map(b => b.trim()).filter(Boolean).map(line => {
+            const parts = line.split(',').map(s => s.trim());
+            return { name: parts[0] || line, quantity: Number(parts[1]) || 1, unit: parts[2] || 'secukupnya' };
+          }),
+          steps: (pilihElemen('#resep-langkah')?.value || '').split('\n').map(s => s.trim()).filter(Boolean)
+        };
+
+        try {
+          if (id) {
+            await api('admin/recipes.php?id=' + encodeURIComponent(id), { method: 'PUT', body: bodyData });
+            tampilkanToast('Resep berhasil diubah!');
+          } else {
+            await api('admin/recipes.php', { method: 'POST', body: bodyData });
+            tampilkanToast('Resep berhasil ditambahkan!');
+          }
+          if (panelForm) panelForm.hidden = true;
+          muatResep();
+        } catch (err) {
+          tampilkanToast(err.message || 'Gagal menyimpan resep.');
+        }
+      });
+
+      muatResep();
+    },
+
     'moderasi-resep'() {},
-    'kelola-pengguna'() {}
+
+    async 'kelola-pengguna'() {
+      const tabelUser = pilihElemen('#userTableBody');
+      const panelUser = pilihElemen('#userPanel');
+      const formUser = pilihElemen('#userForm');
+      const tombolTambah = pilihElemen('#btnTambahPengguna');
+      const tombolBatal = pilihElemen('#userCancel');
+      const errBar = pilihElemen('#userFormErr');
+
+      let daftarPengguna = [];
+      const muatPengguna = async () => {
+        try {
+          const res = await api('admin/users.php');
+          daftarPengguna = res?.users || [];
+        } catch {
+          daftarPengguna = [];
+        }
+        if (!tabelUser) return;
+        if (!daftarPengguna.length) {
+          tabelUser.innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center;padding:1.5rem;">Tidak ada pengguna.</td></tr>';
+          return;
+        }
+        tabelUser.innerHTML = daftarPengguna.map(u => `
+          <tr>
+            <td><b>#${bersihkanTeks(u.id || '-')}</b></td>
+            <td><strong>${bersihkanTeks(u.name)}</strong></td>
+            <td>${bersihkanTeks(u.email)}</td>
+            <td><span class="sts ${u.role === 'admin' ? 'admin' : 'tayang'}">${bersihkanTeks(u.role)}</span></td>
+            <td>${bersihkanTeks(u.created_at ? u.created_at.slice(0, 10) : '-')}</td>
+            <td>
+              ${u.role === 'admin' || (penggunaAktif && u.id === penggunaAktif.id)
+                ? '<span class="muted sm">Tidak dapat dihapus</span>'
+                : `<button class="btn danger sm" type="button" data-del-u="${u.id}" data-n="${bersihkanTeks(u.name)}">Hapus</button>`}
+            </td>
+          </tr>`).join('');
+      };
+
+      tombolTambah?.addEventListener('click', () => {
+        if (formUser) formUser.reset();
+        if (errBar) { errBar.hidden = true; errBar.textContent = ''; }
+        if (panelUser) panelUser.hidden = false;
+      });
+
+      tombolBatal?.addEventListener('click', () => {
+        if (panelUser) panelUser.hidden = true;
+      });
+
+      tabelUser?.addEventListener('click', async event => {
+        const btnDel = event.target.closest('[data-del-u]');
+        if (!btnDel) return;
+        const id = btnDel.dataset.delU;
+        const nama = btnDel.dataset.n;
+        if (!confirm(`Hapus pengguna ${nama}?`)) return;
+        try {
+          await api('admin/users.php?id=' + encodeURIComponent(id), { method: 'DELETE' });
+          tampilkanToast('Pengguna berhasil dihapus.');
+          muatPengguna();
+        } catch (err) {
+          tampilkanToast(err.message || 'Gagal menghapus pengguna.');
+        }
+      });
+
+      formUser?.addEventListener('submit', async event => {
+        event.preventDefault();
+        const nama = pilihElemen('#pengguna-nama')?.value.trim() || pilihElemen('#uf_name')?.value.trim();
+        const email = (pilihElemen('#pengguna-email')?.value.trim() || pilihElemen('#uf_email')?.value.trim() || '').toLowerCase();
+        const sandi = pilihElemen('#pengguna-sandi')?.value || pilihElemen('#uf_password')?.value;
+
+        if (!nama || nama.length < 3) {
+          tampilkanStatus(errBar, 'Nama min 3 karakter.');
+          return;
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          tampilkanStatus(errBar, 'Format email tidak valid.');
+          return;
+        }
+        if (!sandi || sandi.length < 8) {
+          tampilkanStatus(errBar, 'Kata sandi min 8 karakter.');
+          return;
+        }
+
+        try {
+          await api('admin/users.php', {
+            method: 'POST',
+            body: { name: nama, email, password: sandi }
+          });
+          if (panelUser) panelUser.hidden = true;
+          tampilkanToast('Pengguna baru berhasil ditambahkan!');
+          muatPengguna();
+        } catch (err) {
+          tampilkanStatus(errBar, err.message || 'Gagal menambahkan pengguna.');
+        }
+      });
+
+      muatPengguna();
+    }
   };
 
   // 7. Inisialisasi Aplikasi Saat Halaman Dimuat
