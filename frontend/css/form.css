@@ -1,0 +1,63 @@
+/* FoodHub - form.css
+   Kolom input, checkbox, dan tata letak baris form. */
+
+.kolom-input,
+.fld {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1.1rem;
+}
+
+label {
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  padding: 0.65rem 0.9rem;
+  border: 2px solid var(--hitam);
+  border-radius: 8px;
+  background: var(--putih);
+  color: var(--hitam);
+  font: inherit;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--merah);
+  box-shadow: 0 0 0 2px #fecaca;
+}
+
+.chk,
+.centang {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.chk input,
+.centang input {
+  width: auto;
+  margin: 0;
+}
+
+.baris-input {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.baris-form {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+}

@@ -1,0 +1,142 @@
+/* FoodHub - admin.css
+   Halaman admin: statistik, tabel, tombol aksi, pesan error/sukses, dan toast. */
+
+.admin-konten {
+  padding-bottom: 2rem;
+}
+
+.kotak-statistik {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1.2rem;
+  margin-bottom: 1.5rem;
+}
+
+.kotak-statistik .panel {
+  margin: 0;
+  padding: 1.25rem;
+  text-align: center;
+}
+
+.kotak-statistik b {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: var(--merah);
+  font-size: 2.2rem;
+  line-height: 1.1;
+}
+
+.baris {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.8rem;
+  padding: 1rem 1.25rem;
+  border: 2px solid var(--hitam);
+  border-radius: 10px;
+  background: var(--putih);
+  box-shadow: 3px 3px 0 var(--hitam);
+}
+
+.baris > div:first-child {
+  flex: 1;
+}
+
+/* Tabel */
+.wadah-tabel {
+  overflow-x: auto;
+  border: 2px solid var(--hitam);
+  border-radius: 12px;
+  background: var(--putih);
+  box-shadow: var(--bayangan);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e7e5e4;
+  text-align: left;
+}
+
+th {
+  border-bottom: 2px solid var(--hitam);
+  background: var(--krem);
+  font-weight: 700;
+}
+
+tbody tr:hover {
+  background: #fafaf9;
+}
+
+td.kosong {
+  padding: 2rem;
+  color: var(--abu);
+  text-align: center;
+}
+
+.aksi-grup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.t-thumb {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--hitam);
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.foto-pratinjau {
+  max-width: 220px;
+  max-height: 160px;
+  border: 2px solid var(--hitam);
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+/* Pesan dan toast */
+.err,
+.ok,
+.kotak-error {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--merah);
+  border-radius: 8px;
+  background: #fee2e2;
+  color: var(--merah);
+  font-size: 0.9rem;
+}
+
+.ok {
+  border-color: #15803d;
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+#toast {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 99;
+  display: none;
+  padding: 0.8rem 1.4rem;
+  border-radius: 8px;
+  background: var(--hitam);
+  color: var(--putih);
+  box-shadow: 4px 4px 0 var(--abu);
+}
+
+#toast.show {
+  display: block;
+}

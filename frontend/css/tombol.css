@@ -1,0 +1,55 @@
+/* FoodHub - tombol.css
+   Tombol bergaya Figma: border tebal dan bayangan keras. */
+
+.btn {
+  display: inline-block;
+  padding: 0.55rem 1.25rem;
+  border: 2px solid var(--hitam);
+  border-radius: 99px;
+  background: var(--merah);
+  color: var(--putih);
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 var(--hitam);
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.btn:hover {
+  background: var(--merah-tua);
+  text-decoration: none;
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 var(--hitam);
+}
+
+.btn:active {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 var(--hitam);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.btn.ghost {
+  background: var(--putih);
+  color: var(--hitam);
+}
+
+.btn.danger {
+  background: #fee2e2;
+  color: var(--merah);
+  border-color: var(--merah);
+}
+
+.btn.danger:hover {
+  background: #fecaca;
+}
+
+.btn.sm,
+.btn.kecil {
+  padding: 0.35rem 0.85rem;
+  font-size: 0.85rem;
+}

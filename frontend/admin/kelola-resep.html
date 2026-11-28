@@ -76,6 +76,8 @@
         <div class="kolom-input">
           <label for="resep-foto">Foto Resep (Maks. 5 MB)</label>
           <input type="file" id="resep-foto" accept="image/*">
+          <p id="resep-foto-info" class="muted sm">Belum ada foto dipilih.</p>
+          <img id="resep-foto-pratinjau" class="foto-pratinjau" alt="Pratinjau foto resep" hidden>
         </div>
 
         <div class="kolom-input">
@@ -95,7 +97,7 @@
 
         <div style="display:flex;gap:.5rem;justify-content:flex-end">
           <button class="tombol ghost kecil" type="button" id="formCancel">Batal</button>
-          <button class="tombol kecil" type="submit">Simpan Resep</button>
+          <button class="tombol kecil" id="resep-simpan" type="submit">Simpan Resep</button>
         </div>
       </form>
     </div>
@@ -121,5 +123,10 @@
 
   <!-- Menghubungkan file JavaScript -->
   <script src="../js/main.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/resep-bantu.js"></script>
+  <script src="../js/admin.js"></script>
+  <script src="../js/admin-resep.js"></script>
+  <script src="../js/navigasi.js"></script>
 </body>
 </html>

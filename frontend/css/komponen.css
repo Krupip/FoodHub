@@ -1,0 +1,129 @@
+/* FoodHub - komponen.css
+   Komponen yang dipakai berulang: hero, kartu resep, tag, chip, dan status. */
+
+.hero {
+  margin-bottom: 1.8rem;
+  padding: 2.5rem 0;
+  border-bottom: 2px solid var(--hitam);
+  background: var(--krem);
+  text-align: center;
+}
+
+.kepala-bagian,
+.chips,
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.kepala-bagian {
+  justify-content: space-between;
+}
+
+.chips {
+  justify-content: center;
+}
+
+.searchbar {
+  display: flex;
+  gap: 0.6rem;
+  max-width: 540px;
+  margin: 0 auto 1.2rem;
+}
+
+/* Grid dan kartu resep */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1.2rem;
+}
+
+.card {
+  flex-direction: column;
+  overflow: hidden;
+  border: 2px solid var(--hitam);
+  border-radius: 12px;
+  background: var(--putih);
+  box-shadow: var(--bayangan);
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.card:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--hitam);
+}
+
+.card > div:last-child {
+  padding: 0.85rem;
+}
+
+.card h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+}
+
+.card .meta {
+  display: flex;
+  gap: 0.7rem;
+  color: var(--abu);
+  font-size: 0.85rem;
+}
+
+.thumb {
+  width: 100%;
+  height: 160px;
+  overflow: hidden;
+  border-bottom: 2px solid var(--hitam);
+  background: #e7e5e4;
+}
+
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Tag, chip, dan status */
+.tag,
+.chip,
+.sts {
+  display: inline-block;
+  padding: 0.2rem 0.65rem;
+  border: 1.5px solid var(--hitam);
+  border-radius: 99px;
+  background: var(--kuning);
+  color: var(--hitam);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.chip {
+  padding: 0.35rem 0.85rem;
+  background: var(--putih);
+  cursor: pointer;
+}
+
+.chip:hover {
+  text-decoration: none;
+  background: var(--krem);
+}
+
+.sts.tayang {
+  border-color: #166534;
+  background: #dcfce7;
+  color: #166534;
+}
+
+.sts.sembunyi {
+  border-color: #991b1b;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.sts.admin {
+  border-color: #3730a3;
+  background: #e0e7ff;
+  color: #3730a3;
+}
